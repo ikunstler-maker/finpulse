@@ -1,0 +1,3354 @@
+<!DOCTYPE html>
+<html lang="uk" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>FinPulse - Трекер бюджету за ЗП-циклом</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js для аналітики та динаміки -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        darkbg: '#0b1120',
+                        darkcard: '#131d31',
+                        darkborder: '#1e293b'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+        * {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+        /* Анімація для прострочених чекбоксів */
+        @keyframes pulse-gold {
+            0%, 100% {
+                box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.7);
+            }
+            50% {
+                box-shadow: 0 0 0 5px rgba(251, 191, 36, 0);
+            }
+        }
+        .pulse-overdue {
+            animation: pulse-gold 2s infinite;
+        }
+        /* Кастомний скролбар */
+        ::-webkit-scrollbar {
+            width: 4px;
+            height: 4px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 9999px;
+        }
+        /* Стилі для світлої теми */
+        html.light {
+            background-color: #f8fafc;
+            color: #0f172a;
+        }
+        html.light body {
+            background-color: #f8fafc !important;
+            color: #0f172a !important;
+        }
+        html.light .bg-darkbg {
+            background-color: #f8fafc !important;
+        }
+        html.light .bg-darkcard {
+            background-color: #ffffff !important;
+            border-color: #e2e8f0 !important;
+            box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.05);
+        }
+        html.light .border-darkborder {
+            border-color: #e2e8f0 !important;
+        }
+        html.light #kpi-hero-section {
+            background: #ffffff !important;
+            background-image: none !important;
+            border-color: #e2e8f0 !important;
+            box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.05);
+        }
+        html.light #kpi-in-hand-uah {
+            color: #0f172a !important;
+        }
+        html.light #category-summary-widget {
+            background: #ffffff !important;
+            background-image: none !important;
+            border-color: #e2e8f0 !important;
+            box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.05);
+        }
+        html.light .cat-summary-box {
+            background-color: #f8fafc !important;
+            border-color: #e2e8f0 !important;
+        }
+        html.light .expense-row {
+            background-color: #ffffff !important;
+            border-color: #e2e8f0 !important;
+            color: #1e293b !important;
+        }
+        html.light .expense-row:hover {
+            background-color: #f8fafc !important;
+        }
+        html.light #bridge-card {
+            background-color: #fffbeb !important;
+            border-color: #fde68a !important;
+            color: #92400e !important;
+        }
+        html.light #bridge-items-list > div {
+            background-color: #fef3c7 !important;
+            border-color: #fde68a !important;
+            color: #92400e !important;
+        }
+        html.light #overdue-alert-banner {
+            background-color: #fffbeb !important;
+            border-color: #fde68a !important;
+            color: #92400e !important;
+        }
+        html.light #incomes-section {
+            background-color: #f0fdf4 !important;
+            border-color: #bbf7d0 !important;
+            color: #14532d !important;
+        }
+        html.light #incomes-items-list > div {
+            background-color: #ffffff !important;
+            border-color: #dcfce7 !important;
+            color: #166534 !important;
+        }
+        html.light #income-item-modal > div {
+            background-color: #ffffff !important;
+            border-color: #e2e8f0 !important;
+            color: #0f172a !important;
+        }
+        html.light #custom-date-range-panel {
+            background-color: #ffffff !important;
+            border-color: #e2e8f0 !important;
+        }
+        html.light input, html.light select {
+            background-color: #ffffff !important;
+            border-color: #cbd5e1 !important;
+            color: #0f172a !important;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 dark:bg-darkbg text-slate-800 dark:text-slate-100 min-h-screen font-sans pb-24 transition-colors duration-200">
+
+    <!-- ФІКСОВАНА ВЕРХНЯ ШАПКА -->
+    <header class="sticky top-0 z-40 bg-white/90 dark:bg-darkbg/90 backdrop-blur-md border-b border-slate-200 dark:border-darkborder shadow-sm">
+        <div class="max-w-md mx-auto px-4 py-2.5 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <div class="w-8 h-8 rounded-xl bg-emerald-500 text-slate-950 flex items-center justify-center font-black text-sm shadow-md shadow-emerald-500/20">
+                    FP
+                </div>
+                <div>
+                    <div class="flex items-center gap-1.5">
+                        <span class="text-sm font-black tracking-tight text-slate-900 dark:text-white">FinPulse</span>
+                        <span class="px-1.5 py-0.2 rounded-full text-[9px] font-semibold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 flex items-center gap-0.5">
+                            🔒 E2E Safe
+                        </span>
+                    </div>
+                    <div class="text-[9px] text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                        <span>🕒 Сьогодні:</span>
+                        <span id="header-today-date" class="font-bold text-slate-700 dark:text-slate-300">23 жовтня 2026</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-1">
+                <!-- Калькулятор звірки балансу -->
+                <button onclick="openReconciliationModal()" class="w-8 h-8 rounded-xl bg-slate-100 dark:bg-darkcard border border-slate-200 dark:border-darkborder flex items-center justify-center text-xs text-amber-500 hover:bg-slate-200 dark:hover:bg-slate-800 transition" title="Калькулятор звірки залишку та забутих витрат">
+                    🧮
+                </button>
+                <!-- Перемикач теми -->
+                <button onclick="toggleTheme()" class="w-8 h-8 rounded-xl bg-slate-100 dark:bg-darkcard border border-slate-200 dark:border-darkborder flex items-center justify-center text-xs text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 transition" title="Змінити тему">
+                    <span id="theme-icon">🌙</span>
+                </button>
+                <!-- Резервна копія (Backup / Export) -->
+                <button onclick="openBackupModal()" class="w-8 h-8 rounded-xl bg-slate-100 dark:bg-darkcard border border-slate-200 dark:border-darkborder flex items-center justify-center text-xs text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 transition" title="Резервна копія">
+                    ☁️
+                </button>
+                <!-- Налаштування ЗП -->
+                <button onclick="openSalarySettingsModal()" class="w-8 h-8 rounded-xl bg-slate-100 dark:bg-darkcard border border-slate-200 dark:border-slate-800 flex items-center justify-center text-xs text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 transition" title="Налаштування ЗП та курсу">
+                    ⚙️
+                </button>
+            </div>
+        </div>
+
+        <!-- ГОЛОВНІ ВКЛАДКИ: БЮДЖЕТ / ДОХОДИ / АНАЛІТИКА -->
+        <div class="max-w-md mx-auto px-3.5 pb-2 pt-0.5 grid grid-cols-3 gap-1.5">
+            <button id="main-tab-budget-btn" onclick="switchMainTab('budget')" class="py-1.5 px-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 bg-emerald-500 text-slate-950 shadow-sm truncate">
+                <span>📋 Бюджет</span>
+            </button>
+            <button id="main-tab-incomes-btn" onclick="switchMainTab('incomes')" class="py-1.5 px-2 rounded-xl text-xs font-semibold transition flex items-center justify-center gap-1 bg-slate-100 dark:bg-darkcard text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-darkborder hover:text-white truncate">
+                <span>💰 Доходи</span>
+            </button>
+            <button id="main-tab-analytics-btn" onclick="switchMainTab('analytics')" class="py-1.5 px-2 rounded-xl text-xs font-semibold transition flex items-center justify-center gap-1 bg-slate-100 dark:bg-darkcard text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-darkborder hover:text-white truncate">
+                <span>📊 Звіти</span>
+            </button>
+        </div>
+    </header>
+
+    <main class="max-w-md mx-auto px-3.5 pt-3 space-y-3.5">
+
+        <!-- СЕКЦІЯ 1: БЮДЖЕТ ЦИКЛУ -->
+        <div id="tab-budget-content" class="space-y-3.5">
+
+            <!-- ПЕРЕМИКАЧ МІСЯЦІВ ТА РЕЖИМІВ -->
+            <div class="flex items-center justify-between gap-2">
+                <!-- Селектор місяця -->
+                <div class="flex items-center bg-white dark:bg-darkcard border border-slate-200 dark:border-darkborder rounded-xl p-1 shadow-sm flex-1">
+                    <button onclick="prevMonth()" class="w-7 h-7 flex items-center justify-center text-slate-400 hover:text-white rounded-lg transition text-xs font-bold">
+                        ◀
+                    </button>
+                    <div class="flex-1 text-center font-bold text-xs text-slate-800 dark:text-slate-200 flex items-center justify-center gap-1 cursor-pointer" onclick="toggleMonthDropdown()">
+                        <span id="current-month-label">Жовтень 2026</span>
+                        <span class="text-[10px] text-slate-400">▼</span>
+                    </div>
+                    <button onclick="nextMonth()" class="w-7 h-7 flex items-center justify-center text-slate-400 hover:text-white rounded-lg transition text-xs font-bold">
+                        ▶
+                    </button>
+                </div>
+
+                <!-- Випадаючий список усіх місяців (прихований) -->
+                <div id="months-dropdown" class="hidden absolute top-28 left-4 right-4 z-50 bg-white dark:bg-darkcard border border-slate-200 dark:border-darkborder rounded-2xl shadow-2xl p-2 space-y-1 max-h-60 overflow-y-auto">
+                    <!-- Заповнюється скриптом -->
+                </div>
+
+                <!-- Режими: Огляд / Керування -->
+                <div class="flex items-center bg-slate-200 dark:bg-slate-800/80 p-0.5 rounded-xl border border-slate-300 dark:border-slate-700 text-xs font-medium">
+                    <button id="mode-view-btn" onclick="setAppMode('view')" class="px-2.5 py-1.5 rounded-lg text-slate-600 dark:text-slate-300 transition flex items-center gap-1 text-[11px]">
+                        <span>👁️ Огляд</span>
+                    </button>
+                    <button id="mode-edit-btn" onclick="setAppMode('edit')" class="px-2.5 py-1.5 rounded-lg bg-emerald-500 text-slate-950 font-bold transition flex items-center gap-1 text-[11px] shadow-sm">
+                        <span>✏️ Керування</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- КАРТКА ФІНАНСОВОГО ПУЛЬСУ (KPI ДАШБОРД) -->
+            <section id="kpi-hero-section" class="rounded-2xl p-4 bg-white dark:bg-gradient-to-br dark:from-slate-900 dark:via-darkcard dark:to-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm dark:shadow-lg relative overflow-hidden transition-all">
+                <!-- Дохід у USDT (Binance) та UAH -->
+                <div class="flex items-center justify-between text-xs mb-2 pb-2 border-b border-slate-200 dark:border-slate-800/80">
+                    <div class="flex items-center gap-1.5 cursor-pointer group" onclick="openSalarySettingsModal()" title="Натисніть, щоб скоригувати ЗП, заощадження чи курс виводу">
+                        <span class="w-5 h-5 rounded-md bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 flex items-center justify-center text-[10px] font-bold">💰</span>
+                        <span class="text-[11px] font-medium text-slate-700 dark:text-slate-300 group-hover:text-emerald-500 dark:group-hover:text-emerald-400 transition flex items-center gap-1">
+                            Всі доходи циклу (ЗП на <span id="kpi-salary-day" class="font-bold text-slate-900 dark:text-white">8</span>-е)
+                            <span class="text-[10px] text-slate-400">✏️</span>
+                        </span>
+                    </div>
+                    <div onclick="openSalarySettingsModal()" class="text-right cursor-pointer group" title="Редагувати доходи та ЗП">
+                        <div class="text-xs font-bold text-emerald-600 dark:text-emerald-400 group-hover:underline" id="kpi-income-display">72,040.96 ₴</div>
+                        <div class="text-[10px] text-slate-500 dark:text-slate-400 font-mono" id="kpi-income-usdt-display">1,600.00 USDT</div>
+                    </div>
+                </div>
+
+                <!-- ГОЛОВНЕ ЧИСЛО: ЗАРАЗ НА РУКАХ -->
+                <div class="my-2">
+                    <div class="text-[10px] uppercase font-bold tracking-wider text-emerald-600 dark:text-emerald-400">Зараз на руках (факт)</div>
+                    <div class="flex items-baseline gap-2 mt-0.5">
+                        <span class="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight" id="kpi-in-hand-uah">0.00 ₴</span>
+                        <span class="text-xs font-medium text-emerald-600 dark:text-emerald-300/80" id="kpi-in-hand-usd">₮0.00</span>
+                    </div>
+                    <p class="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">Враховуючи отримані доходи та оплачені витрати</p>
+                </div>
+
+                <!-- ПРОГРЕС БАР ВИТРАТ -->
+                <div class="mt-3">
+                    <div class="flex justify-between text-[10px] text-slate-500 dark:text-slate-400 mb-1">
+                        <span>Витрачено: <b id="progress-spent-text" class="text-slate-800 dark:text-slate-200">0%</b></span>
+                        <span>План сплати: <b id="progress-total-text" class="text-slate-800 dark:text-slate-200">0 ₴</b></span>
+                    </div>
+                    <div class="w-full h-2 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden flex">
+                        <div id="progress-bar-paid" class="h-full bg-emerald-500 transition-all duration-300" style="width: 0%"></div>
+                        <div id="progress-bar-pending" class="h-full bg-amber-500/40 transition-all duration-300" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <!-- СУБ-ПОКАЗНИКИ -->
+                <div class="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-slate-200 dark:border-slate-800/80">
+                    <div class="bg-slate-50 dark:bg-slate-900/60 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800">
+                        <div class="text-[10px] text-amber-600 dark:text-amber-400 font-semibold flex items-center gap-1">
+                            <span>⏳ До сплати</span>
+                        </div>
+                        <div class="text-sm font-bold text-slate-900 dark:text-slate-100 mt-0.5" id="kpi-remaining-to-pay-uah">0 ₴</div>
+                        <div class="text-[9px] text-slate-500 dark:text-slate-400">поточні + місток до ЗП</div>
+                    </div>
+
+                    <div class="bg-slate-50 dark:bg-slate-900/60 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800">
+                        <div class="text-[10px] text-teal-600 dark:text-teal-400 font-semibold flex items-center gap-1">
+                            <span>🎯 Вільний залишок</span>
+                        </div>
+                        <div class="text-sm font-bold text-emerald-600 dark:text-emerald-400 mt-0.5" id="kpi-free-balance-uah">0 ₴</div>
+                        <div class="text-[9px] text-slate-500 dark:text-slate-400" id="kpi-free-balance-usd">₮0.00 у кінці циклу</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- КОМПАКТНИЙ БАНЕР ДОХОДІВ З ПЕРЕХОДОМ У ВКЛАДКУ ДОХОДІВ -->
+            <section onclick="switchMainTab('incomes')" class="rounded-2xl p-3 bg-emerald-500/10 hover:bg-emerald-500/15 border border-emerald-500/20 text-slate-200 cursor-pointer transition flex items-center justify-between gap-2 shadow-sm group">
+                <div class="flex items-center gap-2.5 min-w-0">
+                    <div class="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-sm font-bold flex-shrink-0 group-hover:scale-105 transition-transform">
+                        💰
+                    </div>
+                    <div class="min-w-0">
+                        <div class="flex items-center gap-1.5 flex-wrap">
+                            <span class="text-xs font-bold text-slate-900 dark:text-white">Доходи та надходження циклу</span>
+                            <span class="px-1.5 py-0.2 rounded-md bg-emerald-500/20 text-[9px] font-mono text-emerald-600 dark:text-emerald-400 font-bold" id="incomes-brief-badge">ЗП + джерела</span>
+                        </div>
+                        <div class="text-[10px] text-slate-500 dark:text-slate-400">
+                            Всього: <span class="font-bold text-emerald-600 dark:text-emerald-400 font-mono" id="incomes-brief-total">0.00 ₴</span> • Натисніть для перегляду та додавання
+                        </div>
+                    </div>
+                </div>
+                <div class="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 text-xs font-bold flex-shrink-0 group-hover:translate-x-0.5 transition-transform">
+                    <span>Керувати</span>
+                    <span>➔</span>
+                </div>
+            </section>
+
+            <!-- БЛОК-СПОВІЩЕННЯ: ПРОСТРОЧЕНІ ЧЕКБОКСИ -->
+            <section id="overdue-alert-banner" class="rounded-2xl p-3 bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/30 text-slate-800 dark:text-amber-200 hidden transition-all">
+                <div class="flex items-center justify-between gap-2.5">
+                    <div class="flex items-center gap-2.5 min-w-0">
+                        <div class="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center text-sm font-bold flex-shrink-0">
+                            ⚠️
+                        </div>
+                        <div class="min-w-0">
+                            <div class="flex items-center gap-1.5 flex-wrap">
+                                <span class="text-xs font-bold text-amber-700 dark:text-amber-400">Прострочені платежі</span>
+                                <span id="overdue-count-badge" class="px-1.5 py-0.5 rounded-md bg-amber-500/20 text-amber-800 dark:text-amber-300 text-[10px] font-mono font-bold">0 очікують</span>
+                            </div>
+                            <div id="overdue-subtext" class="text-[10px] text-slate-500 dark:text-amber-200/80 truncate">Планова дата платежу вже минула</div>
+                        </div>
+                    </div>
+                    <button onclick="filterByOverdueOnly()" class="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 active:scale-95 text-slate-950 font-bold text-[11px] transition whitespace-nowrap shadow-sm flex items-center gap-1 flex-shrink-0">
+                        <span>Показати</span>
+                        <span>➔</span>
+                    </button>
+                </div>
+            </section>
+
+            <!-- ЗАРПЛАТНИЙ МІСТОК ДО ЗП НАСТУПНОГО МІСЯЦЯ -->
+            <section id="bridge-card" class="rounded-2xl p-3 bg-amber-500/10 border border-amber-500/20 text-amber-400 transition-all">
+                <div class="flex items-center justify-between cursor-pointer" onclick="toggleBridgeDetails()">
+                    <div class="flex items-center gap-2">
+                        <span class="text-base">🌉</span>
+                        <div>
+                            <div class="text-xs font-bold flex items-center gap-1.5">
+                                <span>Витрати до ЗП наступного місяця</span>
+                                <span class="px-1.5 py-0.2 rounded-md bg-amber-500/20 text-[9px] font-mono" id="bridge-days-range">1-7 число</span>
+                            </div>
+                            <div class="text-[10px] text-slate-500 dark:text-slate-400">
+                                Зарезервовано з поточної ЗП: <span class="font-bold text-amber-600 dark:text-amber-400" id="bridge-total-display">0.00 ₴</span>
+                            </div>
+                        </div>
+                    </div>
+                    <span id="bridge-toggle-arrow" class="text-xs transition-transform">▼</span>
+                </div>
+                <div id="bridge-items-list" class="mt-2 pt-2 border-t border-amber-500/20 space-y-1.5 hidden">
+                    <!-- Заповнюється скриптом -->
+                </div>
+            </section>
+
+            <!-- ПАНЕЛЬ ФІЛЬТРІВ ТА СТАТУСІВ -->
+            <div class="space-y-2">
+                <div class="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs select-none">
+                    <button onclick="setStatusFilter('all')" id="filter-btn-all" class="filter-status-btn px-2.5 py-1 rounded-xl font-bold bg-emerald-500 text-slate-950 transition">
+                        Всі (<span id="count-all">0</span>)
+                    </button>
+                    <button onclick="setStatusFilter('pending')" id="filter-btn-pending" class="filter-status-btn px-2.5 py-1 rounded-xl bg-slate-200 dark:bg-darkcard text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-darkborder transition">
+                        Очікують (<span id="count-pending">0</span>)
+                    </button>
+                    <button onclick="setStatusFilter('overdue')" id="filter-btn-overdue" class="filter-status-btn px-2.5 py-1 rounded-xl bg-slate-200 dark:bg-darkcard text-amber-600 dark:text-amber-400 border border-slate-300 dark:border-darkborder transition">
+                        ⚠️ Минулі (<span id="count-overdue">0</span>)
+                    </button>
+                    <button onclick="setStatusFilter('paid')" id="filter-btn-paid" class="filter-status-btn px-2.5 py-1 rounded-xl bg-slate-200 dark:bg-darkcard text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-darkborder transition">
+                        Сплачені (<span id="count-paid">0</span>)
+                    </button>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <select id="category-filter" onchange="onCategoryFilterChange()" class="w-full px-3 py-1.5 bg-white dark:bg-darkcard border border-slate-300 dark:border-darkborder rounded-xl text-xs text-slate-700 dark:text-slate-200 outline-none">
+                        <option value="all">Усі категорії</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- ВІДЖЕТ АНАЛІТИКИ ОБРАНОЇ КАТЕГОРІЇ -->
+            <section id="category-summary-widget" class="rounded-2xl p-3 bg-white dark:bg-darkcard border border-slate-200 dark:border-darkborder space-y-2 transition-all">
+                <div class="flex items-center justify-between text-xs">
+                    <div class="flex items-center gap-1.5 font-bold text-slate-800 dark:text-slate-200">
+                        <span id="cat-summary-icon">📊</span>
+                        <span id="cat-summary-title">Усі категорії місяця</span>
+                    </div>
+                    <span id="cat-summary-pct" class="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-500/10 px-1.5 py-0.5 rounded-md">
+                        0% сплачено
+                    </span>
+                </div>
+
+                <div class="grid grid-cols-3 gap-1.5 text-center">
+                    <div class="cat-summary-box p-1.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                        <span class="block text-[8px] text-slate-500 dark:text-slate-400">План категорії</span>
+                        <span class="font-bold text-xs text-slate-800 dark:text-slate-200 font-mono" id="cat-summary-total">0 ₴</span>
+                    </div>
+                    <div class="cat-summary-box p-1.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                        <span class="block text-[8px] text-slate-500 dark:text-slate-400">Вже витрачено</span>
+                        <span class="font-bold text-xs text-emerald-600 dark:text-emerald-400 font-mono" id="cat-summary-spent">0 ₴</span>
+                    </div>
+                    <div class="cat-summary-box p-1.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                        <span class="block text-[8px] text-slate-500 dark:text-slate-400">Ще належить</span>
+                        <span class="font-bold text-xs text-amber-600 dark:text-amber-400 font-mono" id="cat-summary-remaining">0 ₴</span>
+                    </div>
+                </div>
+
+                <div class="w-full h-1.5 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
+                    <div id="cat-summary-progress" class="h-full bg-emerald-500 transition-all duration-300" style="width: 0%"></div>
+                </div>
+            </section>
+
+            <!-- КНОПКИ ДІЙ У РЕЖИМІ КЕРУВАННЯ -->
+            <div id="edit-actions-panel" class="flex items-center gap-2">
+                <button onclick="openExpenseModal()" class="flex-1 py-2 px-3 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition shadow-sm">
+                    <span>＋ Додати витрату</span>
+                </button>
+                <button onclick="cloneMonthToNext()" class="py-2 px-3 bg-slate-200 dark:bg-darkcard hover:bg-slate-300 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 font-semibold text-xs rounded-xl flex items-center justify-center gap-1.5 transition border border-slate-300 dark:border-darkborder shadow-sm" title="Скопіювати регулярні витрати у наступний місяць">
+                    <span>📋 Копіювати в наступний</span>
+                </button>
+            </div>
+
+            <!-- СПИСОК ВИТРАТ ПО СЕКЦІЯХ -->
+            <div id="expenses-container" class="space-y-4 pt-1">
+                <!-- Заповнюється скриптом renderExpenses() -->
+            </div>
+
+        </div>
+
+        <!-- СЕКЦІЯ: ДОХОДИ ТА НАДХОДЖЕННЯ ЦИКЛУ (ОКРЕМА ВКЛАДКА) -->
+        <div id="tab-incomes-content" class="space-y-3.5 hidden">
+
+            <!-- КАРТКА ПІДСУМКУ ДОХОДІВ ЦИКЛУ -->
+            <section class="rounded-2xl p-4 bg-white dark:bg-gradient-to-br dark:from-slate-900 dark:via-darkcard dark:to-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-3">
+                <div class="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800">
+                    <div class="flex items-center gap-2">
+                        <span class="w-7 h-7 rounded-xl bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-sm font-bold">💰</span>
+                        <div>
+                            <h3 class="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider">Структура доходів циклу</h3>
+                            <div class="text-[10px] text-slate-500 dark:text-slate-400" id="incomes-tab-month-name">Жовтень 2026</div>
+                        </div>
+                    </div>
+                    <button onclick="openIncomeItemModal()" class="px-2.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold text-[11px] transition shadow-sm flex items-center gap-1">
+                        <span>＋ Нове надходження</span>
+                    </button>
+                </div>
+
+                <!-- 3 ПОКАЗНИКИ ДОХОДУ -->
+                <div class="grid grid-cols-3 gap-2 text-center">
+                    <div class="p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                        <span class="block text-[8px] uppercase tracking-wider text-slate-500 dark:text-slate-400 font-semibold">Всього доходу</span>
+                        <span class="font-black text-xs sm:text-sm text-emerald-600 dark:text-emerald-400 font-mono block mt-0.5" id="incomes-tab-total-all">0.00 ₴</span>
+                        <span class="text-[8px] text-slate-400 font-mono" id="incomes-tab-total-all-usdt">0 USDT</span>
+                    </div>
+                    <div class="p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                        <span class="block text-[8px] uppercase tracking-wider text-slate-500 dark:text-slate-400 font-semibold">Вже на руках (факт)</span>
+                        <span class="font-black text-xs sm:text-sm text-teal-600 dark:text-teal-400 font-mono block mt-0.5" id="incomes-tab-received-sum">0.00 ₴</span>
+                        <span class="text-[8px] text-slate-400 font-mono">отримано ✓</span>
+                    </div>
+                    <div class="p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                        <span class="block text-[8px] uppercase tracking-wider text-slate-500 dark:text-slate-400 font-semibold">Очікується</span>
+                        <span class="font-black text-xs sm:text-sm text-amber-600 dark:text-amber-400 font-mono block mt-0.5" id="incomes-tab-pending-sum">0.00 ₴</span>
+                        <span class="text-[8px] text-slate-400 font-mono">до отримання ⏳</span>
+                    </div>
+                </div>
+
+                <!-- ЗАРПЛАТА BINANCE (USDT) КАРТКА -->
+                <div class="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-between">
+                    <div class="flex items-center gap-2.5">
+                        <span class="text-xl">💼</span>
+                        <div>
+                            <div class="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                                <span>Зарплата (Binance)</span>
+                                <span class="px-1.5 py-0.2 rounded-md bg-emerald-500/20 text-[9px] font-mono text-emerald-600 dark:text-emerald-400 font-bold" id="incomes-tab-sal-day-badge">8 число</span>
+                            </div>
+                            <div class="text-[10px] text-slate-500 dark:text-slate-400 font-mono mt-0.5">
+                                <span id="incomes-tab-sal-usdt">1,600 USDT</span> • Курс: <span id="incomes-tab-sal-rate">45.0256 ₴/₮</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <div class="text-right">
+                            <span class="font-black text-xs sm:text-sm text-emerald-600 dark:text-emerald-400 font-mono block" id="incomes-tab-sal-uah">72,040.96 ₴</span>
+                            <span class="text-[8px] text-emerald-600/70 font-semibold">Фактичний вивід</span>
+                        </div>
+                        <button onclick="openSalarySettingsModal()" class="w-7 h-7 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-600 dark:text-emerald-300 flex items-center justify-center text-xs transition" title="Налаштувати ЗП та курс">
+                            ⚙️
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ГРУПИ НАДХОДЖЕНЬ ІЗ МОЖЛИВІСТЮ ДОДАВАННЯ ПУНКТІВ -->
+            <div id="incomes-groups-container" class="space-y-3.5">
+                <!-- Заповнюється динамічно функцією renderIncomesTab() -->
+            </div>
+
+            <!-- ШВИДКА КНОПКА ДОДАВАННЯ ВНИЗУ -->
+            <div class="pt-2">
+                <button onclick="openIncomeItemModal()" class="w-full py-3 px-4 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold text-xs rounded-2xl flex items-center justify-center gap-2 transition shadow-md">
+                    <span>＋ Додати надходження в будь-яку категорію</span>
+                </button>
+            </div>
+
+        </div>
+
+        <!-- СЕКЦІЯ 2: АНАЛІТИКА ТА ДІАГРАМИ -->
+        <div id="tab-analytics-content" class="space-y-3.5 hidden">
+
+            <!-- ПЕРЕМИКАЧ ТИПУ ПЕРІОДУ -->
+            <div class="flex items-center gap-2 p-1 bg-slate-200 dark:bg-darkcard border border-slate-300 dark:border-darkborder rounded-2xl">
+                <button id="btn-period-type-custom" onclick="setAnalyticsMode('custom')" class="flex-1 py-1.5 px-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 bg-emerald-500 text-slate-950 shadow-sm">
+                    <span>📅 Точний діапазон дат</span>
+                </button>
+                <button id="btn-period-type-presets" onclick="setAnalyticsMode('presets')" class="flex-1 py-1.5 px-2 rounded-xl text-xs font-medium transition flex items-center justify-center gap-1 text-slate-600 dark:text-slate-400 hover:text-white">
+                    <span>⚡ Швидкі періоди</span>
+                </button>
+            </div>
+
+            <!-- ПАНЕЛЬ ТОЧНОГО ВИБОРУ ДАТ -->
+            <div id="custom-date-range-panel" class="p-3 rounded-2xl bg-white dark:bg-darkcard border border-slate-200 dark:border-darkborder space-y-2.5">
+                <div class="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                    <span>🗓️ Вкажіть точні дати «З» та «По»</span>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-[10px] text-slate-500 dark:text-slate-400 mb-1">З числа (від):</label>
+                        <input type="date" id="custom-date-from" onchange="applyCustomDateRange()" class="w-full px-2.5 py-1.5 bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-100 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] text-slate-500 dark:text-slate-400 mb-1">По число (до):</label>
+                        <input type="date" id="custom-date-to" onchange="applyCustomDateRange()" class="w-full px-2.5 py-1.5 bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-100 outline-none">
+                    </div>
+                </div>
+                <div class="flex items-center gap-1.5 pt-1 overflow-x-auto text-[10px]">
+                    <button onclick="setCustomPreset('cycle')" class="px-2 py-1 bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 font-semibold rounded-lg whitespace-nowrap">
+                        🔄 ЗП-цикл (8-е — 7-е)
+                    </button>
+                    <button onclick="setCustomPreset('month')" class="px-2 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg whitespace-nowrap">
+                        1–31 число
+                    </button>
+                    <button onclick="setCustomPreset('today')" class="px-2 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg whitespace-nowrap">
+                        З 1-го по сьогодні
+                    </button>
+                </div>
+            </div>
+
+            <!-- ШВИДКІ ПЕРІОДИ (ПРЕСЕТИ) -->
+            <div id="quick-presets-panel" class="hidden flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+                <button onclick="setAnalyticsPeriod('current')" class="period-btn px-2.5 py-1 rounded-xl bg-slate-200 dark:bg-darkcard text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-darkborder transition" data-period="current">
+                    Поточний місяць
+                </button>
+                <button onclick="setAnalyticsPeriod('3m')" class="period-btn px-2.5 py-1 rounded-xl bg-slate-200 dark:bg-darkcard text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-darkborder transition" data-period="3m">
+                    3 міс
+                </button>
+                <button onclick="setAnalyticsPeriod('6m')" class="period-btn px-2.5 py-1 rounded-xl bg-slate-200 dark:bg-darkcard text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-darkborder transition" data-period="6m">
+                    6 міс
+                </button>
+                <button onclick="setAnalyticsPeriod('year')" class="period-btn px-2.5 py-1 rounded-xl bg-slate-200 dark:bg-darkcard text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-darkborder transition" data-period="year">
+                    Рік
+                </button>
+                <button onclick="setAnalyticsPeriod('all')" class="period-btn px-2.5 py-1 rounded-xl bg-slate-200 dark:bg-darkcard text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-darkborder transition" data-period="all">
+                    Весь час
+                </button>
+            </div>
+
+            <!-- ІНДИКАТОР ОБРАНОГО ПЕРІОДУ -->
+            <div class="flex items-center justify-between text-xs px-1">
+                <span class="text-slate-500 dark:text-slate-400">Аналіз за період:</span>
+                <span id="analytics-period-badge" class="font-bold text-slate-800 dark:text-slate-200 font-mono">Жовтень 2026</span>
+            </div>
+
+            <!-- КАРТКИ ПІДСУМКУ АНАЛІТИКИ (UAH + USD) -->
+            <div class="grid grid-cols-3 gap-2">
+                <div class="p-2.5 rounded-2xl bg-white dark:bg-darkcard border border-slate-200 dark:border-darkborder text-center">
+                    <span class="block text-[9px] text-slate-500 dark:text-slate-400">Дохід періоду</span>
+                    <span class="font-black text-xs text-emerald-600 dark:text-emerald-400 font-mono block mt-0.5" id="an-total-income">0 ₴</span>
+                    <span class="text-[9px] text-slate-400 font-mono" id="an-total-income-usd">$0.00</span>
+                </div>
+                <div class="p-2.5 rounded-2xl bg-white dark:bg-darkcard border border-slate-200 dark:border-darkborder text-center">
+                    <span class="block text-[9px] text-slate-500 dark:text-slate-400">Факт витрат</span>
+                    <span class="font-black text-xs text-slate-800 dark:text-slate-200 font-mono block mt-0.5" id="an-total-spent">0 ₴</span>
+                    <span class="text-[9px] text-slate-400 font-mono" id="an-total-spent-usd">$0.00</span>
+                </div>
+                <div class="p-2.5 rounded-2xl bg-white dark:bg-darkcard border border-slate-200 dark:border-darkborder text-center">
+                    <span class="block text-[9px] text-slate-500 dark:text-slate-400">Залишок/Резерв</span>
+                    <span class="font-black text-xs text-teal-600 dark:text-teal-400 font-mono block mt-0.5" id="an-total-free">0 ₴</span>
+                    <span class="text-[9px] text-slate-400 font-mono" id="an-total-free-usd">$0.00</span>
+                </div>
+            </div>
+
+            <!-- ДІАГРАМА КАТЕГОРІЙ -->
+            <section class="p-3.5 rounded-2xl bg-white dark:bg-darkcard border border-slate-200 dark:border-darkborder space-y-3">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h4 class="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                            <span>🍩 Структура витрат за категоріями</span>
+                        </h4>
+                        <p class="text-[10px] text-slate-500 dark:text-slate-400">Розподіл фінансів за статтями</p>
+                    </div>
+                    <select id="an-chart-mode" onchange="renderAnalyticsCharts()" class="text-[10px] px-2 py-1 bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-lg text-slate-700 dark:text-slate-200 outline-none">
+                        <option value="planned">Усі планові</option>
+                        <option value="paid">Лише сплачені</option>
+                    </select>
+                </div>
+
+                <div class="relative h-56 flex items-center justify-center">
+                    <canvas id="categoryChart"></canvas>
+                </div>
+
+                <div id="chart-legend-list" class="space-y-1.5 pt-2 border-t border-slate-200 dark:border-slate-800/80">
+                    <!-- Заповнюється скриптом з єдиними кольорами -->
+                </div>
+            </section>
+
+            <!-- ДІАГРАМА ДИНАМІКИ ПОМІСЯЧНО -->
+            <section class="p-3.5 rounded-2xl bg-white dark:bg-darkcard border border-slate-200 dark:border-darkborder space-y-3">
+                <div>
+                    <h4 class="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                        <span>📊 Динаміка: Дохід vs Витрати</span>
+                    </h4>
+                    <p class="text-[10px] text-slate-500 dark:text-slate-400">Порівняння прибутків та витрат помісячно</p>
+                </div>
+                <div class="relative h-52">
+                    <canvas id="dynamicsChart"></canvas>
+                </div>
+            </section>
+
+        </div>
+
+    </main>
+
+    <!-- МОДАЛЬНЕ ВІКНО: НАЛАШТУВАННЯ ЗП, ЗАОЩАДЖЕНЬ ТА КУРСУ USDT -->
+    <div id="salary-modal" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 hidden transition-opacity">
+        <div class="w-full max-w-md bg-white dark:bg-darkcard rounded-t-3xl sm:rounded-2xl border border-slate-200 dark:border-darkborder p-5 text-slate-800 dark:text-slate-100 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between mb-3 pb-2 border-b border-slate-200 dark:border-slate-800">
+                <h3 class="text-sm font-bold flex items-center gap-1.5">
+                    <span>⚙️</span>
+                    <span>Дохід циклу та ЗП</span>
+                    <span id="salary-modal-month-name" class="text-xs font-normal text-slate-400"></span>
+                </h3>
+                <button onclick="closeSalarySettingsModal()" class="w-7 h-7 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center text-xs">✕</button>
+            </div>
+
+            <form id="salary-settings-form" onsubmit="saveSalarySettings(event)" class="space-y-3">
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-1">День ЗП (1-31)</label>
+                        <input type="number" min="1" max="31" id="settings-salary-day" required class="w-full px-3 py-2 bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-100 font-mono focus:border-emerald-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-1">Сума в USDT (Binance)</label>
+                        <input type="number" step="0.01" id="settings-income-usdt" oninput="convertSalaryFromUSDT()" required placeholder="1600.00" class="w-full px-3 py-2 bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-emerald-600 dark:text-emerald-400 font-mono font-bold focus:border-emerald-500 outline-none">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-1">Курс P2P виводу (₴ за 1 USDT)</label>
+                    <input type="number" step="0.0001" id="settings-rate" oninput="convertSalaryFromUSDT()" required placeholder="45.0256" class="w-full px-3 py-2 bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-100 font-mono focus:border-emerald-500 outline-none">
+                </div>
+
+                <div class="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 space-y-1.5">
+                    <div class="flex items-center justify-between">
+                        <label class="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">Фактично отримано в грн (₴ UAH)</label>
+                        <button type="button" onclick="recalcUAHFromRate()" class="text-[10px] text-slate-400 hover:text-emerald-500 underline">
+                            З розрахунку (USDT × Курс)
+                        </button>
+                    </div>
+                    <input type="number" step="0.01" id="settings-income-uah" oninput="onManualUahChange()" required placeholder="72040.96" class="w-full px-3 py-2.5 bg-white dark:bg-slate-950 border border-emerald-500/40 rounded-xl text-sm text-emerald-600 dark:text-emerald-400 font-mono font-black focus:border-emerald-500 outline-none shadow-inner">
+                    <div class="flex items-center justify-between text-[10px] text-slate-400 pt-0.5">
+                        <span>Середній курс фактичного виводу:</span>
+                        <span id="effective-rate-badge" class="font-mono font-bold text-slate-700 dark:text-slate-200">~45.02 ₴/₮</span>
+                    </div>
+                </div>
+
+                <!-- БЛОК ЗАОЩАДЖЕНЬ З ПОПЕРЕДНЬОГО МІСЯЦЯ -->
+                <div class="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800 space-y-2">
+                    <div class="text-[11px] font-bold text-slate-700 dark:text-slate-200 flex items-center justify-between">
+                        <span class="flex items-center gap-1.5">
+                            <span>🏦</span>
+                            <span>Заощадження з попереднього місяця</span>
+                        </span>
+                        <button type="button" onclick="autoFillSavingsFromPrevMonth()" class="text-[9px] text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-0.5" title="Підтягнути вільний залишок минулого циклу">
+                            <span>🔄 Взяти залишок</span>
+                        </button>
+                    </div>
+                    <input type="number" step="0.01" id="settings-savings-uah" placeholder="0.00" class="w-full px-3 py-2 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-100 font-mono focus:border-emerald-500 outline-none">
+                    <p class="text-[9px] text-slate-400">
+                        Встановіть вручну суму залишку, яка перейшла з попереднього місяця в новий цикл.
+                    </p>
+                </div>
+
+                <!-- БЛОК ДОДАТКОВОГО ЗАРОБІТКУ (ЗАГАЛЬНОГО) -->
+                <div class="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800 space-y-2">
+                    <div class="text-[11px] font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+                        <span>💼</span>
+                        <span>Додатковий заробіток (загальна сума)</span>
+                    </div>
+                    <input type="number" step="0.01" id="settings-extra-income-uah" placeholder="0.00" class="w-full px-3 py-2 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-100 font-mono focus:border-emerald-500 outline-none">
+                    <p class="text-[9px] text-slate-400">
+                        Якщо не хочете розписувати окремими рядками, вкажіть загальну суму додаткового прибутку тут.
+                    </p>
+                </div>
+
+                <!-- КАЛЬКУЛЯТОР ВИВОДІВ ЧАСТИНАМИ -->
+                <div class="border border-slate-200 dark:border-slate-800 rounded-xl p-2.5 bg-slate-50 dark:bg-slate-900/40">
+                    <button type="button" onclick="toggleMultiPartCalc()" class="w-full flex items-center justify-between text-xs text-slate-600 dark:text-slate-300 hover:text-white font-medium">
+                        <span class="flex items-center gap-1.5">
+                            <span>🧮</span>
+                            <span>Калькулятор виводів частинами</span>
+                        </span>
+                        <span id="multi-calc-arrow" class="text-xs transition-transform">▼</span>
+                    </button>
+                    <div id="multi-calc-body" class="mt-2 pt-2 border-t border-slate-200 dark:border-slate-800 space-y-2 hidden">
+                        <div id="multi-calc-rows" class="space-y-1.5">
+                            <input type="number" step="0.01" placeholder="Вивід 1 (грн)" class="multi-part-input w-full px-2.5 py-1.5 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg text-xs font-mono text-slate-800 dark:text-slate-200">
+                            <input type="number" step="0.01" placeholder="Вивід 2 (грн)" class="multi-part-input w-full px-2.5 py-1.5 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg text-xs font-mono text-slate-800 dark:text-slate-200">
+                        </div>
+                        <div class="flex items-center gap-2 pt-1">
+                            <button type="button" onclick="addMultiCalcRow()" class="px-2 py-1 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-[10px]">
+                                ＋ Додати рядок
+                            </button>
+                            <button type="button" onclick="applyMultiCalcSum()" class="flex-1 py-1 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-600 dark:text-emerald-300 font-bold rounded-lg text-[10px] border border-emerald-500/30">
+                                Підсумувати в дохід
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2 pt-2">
+                    <button type="button" onclick="closeSalarySettingsModal()" class="py-2.5 px-3 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-medium">
+                        Скасувати
+                    </button>
+                    <button type="submit" class="flex-1 py-2.5 px-4 bg-emerald-500 hover:bg-emerald-600 text-slate-950 rounded-xl text-xs font-bold transition shadow-md">
+                        Зберегти дохід
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- МОДАЛЬНЕ ВІКНО: СТВОРЕННЯ / РЕДАГУВАННЯ СТАТТІ НАДХОДЖЕННЯ -->
+    <div id="income-item-modal" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 hidden transition-opacity">
+        <div class="w-full max-w-md bg-white dark:bg-darkcard rounded-t-3xl sm:rounded-2xl border border-slate-200 dark:border-darkborder p-5 text-slate-800 dark:text-slate-100 shadow-2xl">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-sm font-bold flex items-center gap-1.5">
+                    <span>💰</span>
+                    <span id="income-item-modal-title">Додати надходження</span>
+                </h3>
+                <button onclick="closeIncomeItemModal()" class="w-7 h-7 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center text-xs">✕</button>
+            </div>
+
+            <form id="income-item-form" onsubmit="saveIncomeItem(event)" class="space-y-3">
+                <input type="hidden" id="modal-income-id">
+
+                <div>
+                    <div class="flex items-center justify-between mb-1">
+                        <label class="text-[11px] font-medium text-slate-500 dark:text-slate-400">Категорія надходження</label>
+                        <button type="button" id="income-modal-autofill-btn" onclick="autofillSavingsIntoModal()" class="text-[10px] text-emerald-600 dark:text-emerald-400 hover:underline hidden flex items-center gap-0.5">
+                            <span>🔄 Взяти залишок з минулого місяця</span>
+                        </button>
+                    </div>
+                    <select id="modal-income-category" onchange="onIncomeModalCategoryChange()" class="w-full px-3 py-2 bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-100 focus:border-emerald-500 outline-none">
+                    </select>
+                </div>
+
+                <!-- ПОЛЕ ДЛЯ ПОВЕРНЕННЯ БОРГУ (ХТО ПОВЕРНУВ / ДЖЕРЕЛО) -->
+                <div id="income-modal-debtor-group" class="hidden">
+                    <label class="block text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-1">Хто повертає борг (ПІБ / Ім'я)</label>
+                    <input type="text" id="modal-income-debtor" placeholder="Наприклад: Владислава, Олег, Андрій" class="w-full px-3 py-2 bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-100 focus:border-emerald-500 outline-none">
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-1" id="modal-income-title-label">Призначення / Опис надходження</label>
+                    <input type="text" id="modal-income-title" required placeholder="Наприклад: Заощаджено на Моно, Фріланс верстка, Повернення за каву" class="w-full px-3 py-2 bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-100 focus:border-emerald-500 outline-none">
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-1">Сума ₴ (UAH)</label>
+                        <input type="number" step="0.01" id="modal-income-uah" required placeholder="0.00" class="w-full px-3 py-2 bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-100 font-mono font-bold focus:border-emerald-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-1">Число надходження (1-31)</label>
+                        <input type="number" min="1" max="31" id="modal-income-day" required value="1" class="w-full px-3 py-2 bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-100 font-mono focus:border-emerald-500 outline-none">
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2 pt-1">
+                    <input type="checkbox" id="modal-income-isreceived" checked class="w-4 h-4 rounded text-emerald-500 bg-slate-100 dark:bg-slate-900 border-slate-300 dark:border-slate-700 accent-emerald-500 cursor-pointer">
+                    <label for="modal-income-isreceived" class="text-xs text-slate-700 dark:text-slate-300 cursor-pointer select-none">Вже фактично отримано на руки</label>
+                </div>
+
+                <div class="flex items-center gap-2 pt-3">
+                    <button type="button" id="modal-income-delete-btn" onclick="deleteCurrentIncomeItem()" class="py-2.5 px-3 bg-rose-500/20 text-rose-500 dark:text-rose-300 border border-rose-500/30 rounded-xl text-xs font-semibold hover:bg-rose-500/30 transition hidden">
+                        Видалити
+                    </button>
+                    <button type="submit" class="flex-1 py-2.5 px-4 bg-emerald-500 hover:bg-emerald-600 text-slate-950 rounded-xl text-xs font-bold transition shadow-md">
+                        Зберегти надходження
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- МОДАЛЬНЕ ВІКНО: КАЛЬКУЛЯТОР ЗВІРКИ ЗАЛИШКУ -->
+    <div id="reconciliation-modal" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 hidden">
+        <div class="w-full max-w-md bg-white dark:bg-darkcard rounded-t-3xl sm:rounded-2xl border border-slate-200 dark:border-darkborder p-5 text-slate-800 dark:text-slate-100 shadow-2xl">
+            <div class="flex items-center justify-between mb-3">
+                <h3 class="text-sm font-bold flex items-center gap-1.5">
+                    <span>🧮</span>
+                    <span>Калькулятор звірки залишку</span>
+                </h3>
+                <button onclick="closeReconciliationModal()" class="w-7 h-7 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center text-xs">✕</button>
+            </div>
+            <p class="text-xs text-slate-500 dark:text-slate-400 mb-3 leading-relaxed">
+                Введіть реальну суму на банківській картці або в гаманці для швидкої перевірки безпечного залишку та виявлення забутих витрат.
+            </p>
+
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-1">Реальний баланс прямо зараз (₴)</label>
+                    <input type="number" step="0.01" id="recon-actual-input" oninput="calculateReconciliation()" placeholder="Наприклад: 18500.00" class="w-full px-3 py-2.5 bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-sm font-mono font-bold text-slate-900 dark:text-white focus:border-emerald-500 outline-none">
+                </div>
+
+                <div class="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 space-y-2 text-xs">
+                    <div class="flex justify-between">
+                        <span class="text-slate-500 dark:text-slate-400">Ще належить сплатити до кінця циклу:</span>
+                        <span class="font-bold text-amber-600 dark:text-amber-400 font-mono" id="recon-to-pay-display">0.00 ₴</span>
+                    </div>
+                    <div class="flex justify-between border-t border-slate-200 dark:border-slate-800 pt-2">
+                        <span class="font-medium text-slate-700 dark:text-slate-200">Безпечний залишок після оплат:</span>
+                        <span class="font-black text-emerald-600 dark:text-emerald-400 font-mono" id="recon-safe-balance-display">0.00 ₴</span>
+                    </div>
+                </div>
+
+                <!-- ДЕТЕКТОР ЗАБУТИХ ВИТРАТ -->
+                <div id="recon-discrepancy-card" class="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-300 text-xs space-y-2 hidden">
+                    <div class="flex items-center justify-between font-bold">
+                        <span>⚠️ Звірка з обліком:</span>
+                        <span id="recon-diff-display" class="font-mono">0.00 ₴</span>
+                    </div>
+                    <p class="text-[10px] text-amber-800 dark:text-amber-200/80" id="recon-diff-note">
+                        Фактичний залишок менший, ніж має бути за таблицею. Можливо, були необліковані покупки.
+                    </p>
+                    <button onclick="createExpenseFromDiscrepancy()" class="w-full py-1.5 px-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-lg text-[11px] transition">
+                        ➕ Занести цю різницю як «Необліковані витрати»
+                    </button>
+                </div>
+            </div>
+
+            <div class="pt-4">
+                <button onclick="closeReconciliationModal()" class="w-full py-2 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-xl text-xs font-semibold">
+                    Закрити
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- МОДАЛЬНЕ ВІКНО: СТВОРЕННЯ / РЕДАГУВАННЯ ВИТРАТИ -->
+    <div id="expense-modal" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 hidden">
+        <div class="w-full max-w-md bg-white dark:bg-darkcard rounded-t-3xl sm:rounded-2xl border border-slate-200 dark:border-darkborder p-5 text-slate-800 dark:text-slate-100 shadow-2xl">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-sm font-bold flex items-center gap-1.5">
+                    <span id="modal-title-icon">✏️</span>
+                    <span id="modal-expense-title">Додати витрату</span>
+                </h3>
+                <button onclick="closeExpenseModal()" class="w-7 h-7 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center text-xs">✕</button>
+            </div>
+
+            <form id="expense-form" onsubmit="saveExpense(event)" class="space-y-3">
+                <input type="hidden" id="modal-id">
+
+                <div>
+                    <label class="block text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-1">Призначення платежу</label>
+                    <input type="text" id="modal-title" required placeholder="Наприклад: Apple One, Продукти, Оренда" class="w-full px-3 py-2 bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-100 focus:border-emerald-500 outline-none">
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-1">Категорія</label>
+                        <select id="modal-category" class="w-full px-3 py-2 bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-100 focus:border-emerald-500 outline-none">
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-1">Розділ списку</label>
+                        <select id="modal-section" class="w-full px-3 py-2 bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-100 focus:border-emerald-500 outline-none">
+                            <option value="regular">📋 Обов'язкові регулярні</option>
+                            <option value="lifestyle">✨ Краса, догляд та додаткові</option>
+                            <option value="debts">💳 Борги та розстрочки</option>
+                            <option value="gifts">🎁 Подарунки та свята</option>
+                            <option value="charity">🕊️ Благодійність</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- ВИБІР ВАЛЮТИ ТА СУМИ -->
+                <div class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 space-y-2">
+                    <div class="flex items-center justify-between text-xs">
+                        <span class="text-[11px] font-medium text-slate-500 dark:text-slate-400">Валюта списання:</span>
+                        <div class="flex items-center gap-2">
+                            <label class="inline-flex items-center gap-1 cursor-pointer">
+                                <input type="radio" name="currency_type" value="uah" checked onchange="toggleCurrencyMode('uah')" class="accent-emerald-500">
+                                <span class="text-xs font-bold text-slate-700 dark:text-slate-300">₴ Гривня</span>
+                            </label>
+                            <label class="inline-flex items-center gap-1 cursor-pointer">
+                                <input type="radio" name="currency_type" value="usd" onchange="toggleCurrencyMode('usd')" class="accent-emerald-500">
+                                <span class="text-xs font-bold text-slate-700 dark:text-slate-300">$ Долар США</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-[10px] text-slate-500 dark:text-slate-400 mb-0.5">Сума ₴ (UAH)</label>
+                            <input type="number" step="0.01" id="modal-uah" oninput="onUahInput()" required placeholder="0.00" class="w-full px-3 py-1.5 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-100 font-mono font-bold focus:border-emerald-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-slate-500 dark:text-slate-400 mb-0.5">Сума $ (USD)</label>
+                            <input type="number" step="0.01" id="modal-usd" oninput="onUsdInput()" placeholder="0.00" class="w-full px-3 py-1.5 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-100 font-mono focus:border-emerald-500 outline-none">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-1">День сплати (1-31)</label>
+                        <input type="number" min="1" max="31" id="modal-day" required value="10" class="w-full px-3 py-2 bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-100 font-mono focus:border-emerald-500 outline-none">
+                    </div>
+                    <div class="flex items-center pt-5">
+                        <label class="inline-flex items-center gap-1.5 cursor-pointer">
+                            <input type="checkbox" id="modal-ispaid" class="w-4 h-4 rounded text-emerald-500 bg-slate-100 dark:bg-slate-900 border-slate-300 dark:border-slate-700 accent-emerald-500">
+                            <span class="text-xs text-slate-700 dark:text-slate-300 select-none">Вже сплачено</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2 pt-3">
+                    <button type="button" id="modal-delete-btn" onclick="deleteCurrentExpense()" class="py-2.5 px-3 bg-rose-500/20 text-rose-500 dark:text-rose-300 border border-rose-500/30 rounded-xl text-xs font-semibold hover:bg-rose-500/30 transition hidden">
+                        Видалити
+                    </button>
+                    <button type="button" id="modal-duplicate-btn" onclick="duplicateCurrentExpense()" class="py-2.5 px-3 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-semibold hover:bg-slate-300 dark:hover:bg-slate-700 transition hidden">
+                        📋 Дублювати
+                    </button>
+                    <button type="submit" class="flex-1 py-2.5 px-4 bg-emerald-500 hover:bg-emerald-600 text-slate-950 rounded-xl text-xs font-bold transition shadow-md">
+                        Зберегти витрату
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- МОДАЛЬНЕ ВІКНО: РЕЗЕРВНА КОПІЯ / BACKUP -->
+    <div id="backup-modal" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 hidden">
+        <div class="w-full max-w-md bg-white dark:bg-darkcard rounded-t-3xl sm:rounded-2xl border border-slate-200 dark:border-darkborder p-5 text-slate-800 dark:text-slate-100 shadow-2xl space-y-4">
+            <div class="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800">
+                <h3 class="text-sm font-bold flex items-center gap-1.5">
+                    <span>☁️</span>
+                    <span>Резервне копіювання даних</span>
+                </h3>
+                <button onclick="closeBackupModal()" class="w-7 h-7 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center text-xs">✕</button>
+            </div>
+
+            <p class="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                Усі ваші дані зберігаються виключно локально у вашому браузері (Offline First). Експортуйте файл резервної копії для перенесення на інший смартфон або збереження історії.
+            </p>
+
+            <div class="space-y-2">
+                <button onclick="exportDataBackup()" class="w-full py-2.5 px-4 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold text-xs rounded-xl flex items-center justify-center gap-2 transition shadow-sm">
+                    <span>💾 Завантажити резервну копію (.json)</span>
+                </button>
+                <label class="w-full py-2.5 px-4 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-xs rounded-xl flex items-center justify-center gap-2 transition cursor-pointer border border-slate-300 dark:border-slate-700">
+                    <span>📥 Відновити з файлу</span>
+                    <input type="file" id="backup-file-input" onchange="importDataBackup(event)" accept=".json" class="hidden">
+                </label>
+                <button onclick="resetToDemoData()" class="w-full py-2 px-3 text-rose-500 dark:text-rose-400 hover:underline text-[11px] font-medium text-center transition">
+                    Скинути до початкових демо-даних з PDF
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ТОСТ-СПОВІЩЕННЯ -->
+    <div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-slate-900/90 text-white px-4 py-2 rounded-2xl text-xs font-medium shadow-2xl border border-slate-700 transition-all opacity-0 pointer-events-none flex items-center gap-2">
+        <span id="toast-icon">✅</span>
+        <span id="toast-msg">Повідомлення</span>
+    </div>
+
+    <script>
+        /**
+         * КАТЕГОРІЇ ТА ЇХНІ КОЛЬОРИ
+         */
+        const CATEGORIES = [
+            { id: 'subscriptions', name: 'Підписки та сервіси', icon: '💻', color: '#8b5cf6', section: 'regular' },
+            { id: 'comm', name: 'Зв\'язок та Інтернет', icon: '📱', color: '#10b981', section: 'regular' },
+            { id: 'housing', name: 'Оренда та ЖКГ', icon: '🏠', color: '#0ea5e9', section: 'regular' },
+            { id: 'food', name: 'Продукти та їжа', icon: '🛒', color: '#f59e0b', section: 'regular' },
+            { id: 'beauty', name: 'Догляд та краса', icon: '💅', color: '#ec4899', section: 'lifestyle' },
+            { id: 'health', name: 'Здоров\'я та медицина', icon: '🩺', color: '#06b6d4', section: 'lifestyle' },
+            { id: 'home', name: 'Побут та ремонт', icon: '🛠️', color: '#6366f1', section: 'lifestyle' },
+            { id: 'other', name: 'Інші витрати', icon: '⚡', color: '#14b8a6', section: 'lifestyle' },
+            { id: 'debts', name: 'Борги та розстрочки', icon: '💳', color: '#e11d48', section: 'debts' },
+            { id: 'gifts', name: 'Подарунки та свята', icon: '🎁', color: '#f97316', section: 'gifts' },
+            { id: 'charity', name: 'Благодійність', icon: '🕊️', color: '#84cc16', section: 'charity' },
+        ];
+
+        const INCOME_CATEGORIES = [
+            { id: 'savings', name: 'Заощадження з попереднього місяця', icon: '🏦', color: '#06b6d4', desc: 'Залишок коштів з минулого циклу чи скарбнички' },
+            { id: 'extra', name: 'Додатковий заробіток / Фріланс', icon: '💼', color: '#f59e0b', desc: 'Підробіток, консультації, проєкти' },
+            { id: 'charity_in', name: 'Благодійні надходження / Донати', icon: '🕊️', color: '#8b5cf6', desc: 'Цільові збори, допомога, гранти' },
+            { id: 'debt_return', name: 'Повернення боргів', icon: '🤝', color: '#ec4899', desc: 'Фіксація: хто, коли та скільки повернув' },
+            { id: 'other_inc', name: 'Інші доходи', icon: '💵', color: '#10b981', desc: 'Кешбек, подарунки, відсотки' },
+        ];
+
+        // Предустановлені обов'язкові статті надходжень для кожного місяця
+        const PRESET_INCOMES = [
+            { id: 'preset_savings', category: 'savings', title: 'Заощадження з попереднього місяця', day: 1, defaultAmount: 0 },
+            { id: 'preset_extra', category: 'extra', title: 'Додатковий заробіток', day: 10, defaultAmount: 0 },
+            { id: 'preset_charity', category: 'charity_in', title: 'Благодійні надходження', day: 15, defaultAmount: 0 },
+            { id: 'preset_debt', category: 'debt_return', title: 'Повернення боргів', day: 20, debtor: '', defaultAmount: 0 }
+        ];
+
+        const SECTIONS = [
+            { id: 'regular', title: 'Обов\'язкові регулярні платежі', icon: '📋' },
+            { id: 'lifestyle', title: 'Краса, догляд та додаткові витрати', icon: '✨' },
+            { id: 'debts', title: 'Борги та розстрочки', icon: '💳' },
+            { id: 'gifts', title: 'Подарунки та свята', icon: '🎁' },
+            { id: 'charity', title: 'Благодійність', icon: '🕊️' },
+        ];
+
+        /**
+         * СТАН ЗАСТОСУНКУ ТА ПОЧАТКОВІ ДАНІ З PDF
+         */
+        const STORAGE_KEY = 'finpulse_app_state_v3';
+
+        function ensurePresetIncomes(month) {
+            if (!month) return;
+            if (!Array.isArray(month.incomes)) month.incomes = [];
+
+            PRESET_INCOMES.forEach(p => {
+                let existing = month.incomes.find(i => i.id === p.id || (i.category === p.category && i.isPreset));
+                if (!existing) {
+                    existing = month.incomes.find(i => i.category === p.category);
+                    if (existing) {
+                        existing.isPreset = true;
+                    } else {
+                        let amount = 0;
+                        if (p.category === 'savings') {
+                            amount = month.savingsUAH !== undefined ? month.savingsUAH : (month.year === 2026 && month.month === 10 ? 3500 : 0);
+                        } else if (p.category === 'extra') {
+                            amount = month.extraIncomeUAH || 0;
+                        }
+                        month.incomes.push({
+                            id: p.id,
+                            title: p.title,
+                            category: p.category,
+                            amountUAH: amount,
+                            day: p.day,
+                            debtor: p.debtor || '',
+                            isReceived: amount > 0,
+                            isPreset: true
+                        });
+                    }
+                }
+            });
+        }
+
+        function getDefaultInitialState() {
+            const state = {
+                activeMonthKey: '2026-10',
+                appMode: 'view', // 'view' або 'edit'
+                months: {
+                    '2026-10': {
+                        year: 2026,
+                        month: 10,
+                        name: 'Жовтень 2026',
+                        salaryDay: 8,
+                        incomeUAH: 72040.96,
+                        incomeUSD: 1600.00,
+                        incomeUSDT: 1600.00,
+                        savingsUAH: 3500.00,
+                        extraIncomeUAH: 0,
+                        incomes: [
+                            { id: 'preset_savings', title: 'Заощадження з попереднього місяця', category: 'savings', amountUAH: 3500.00, day: 1, isReceived: true, isPreset: true },
+                            { id: 'preset_extra', title: 'Додатковий заробіток', category: 'extra', amountUAH: 0.00, day: 10, isReceived: false, isPreset: true },
+                            { id: 'preset_charity', title: 'Благодійні надходження', category: 'charity_in', amountUAH: 0.00, day: 15, isReceived: false, isPreset: true },
+                            { id: 'preset_debt', title: 'Повернення боргів', category: 'debt_return', debtor: 'Владислава', amountUAH: 0.00, day: 20, isReceived: false, isPreset: true }
+                        ],
+                        rate: 45.0256,
+                        expenses: [
+                            { id: 'exp_1', title: 'Triolan xPon', category: 'comm', amountUAH: 330.00, amountUSD: 0, payDay: 30, isPaid: false },
+                            { id: 'exp_2', title: 'Мобільний зв\'язок - Основний', category: 'comm', amountUAH: 330.00, amountUSD: 0, payDay: 27, isPaid: false },
+                            { id: 'exp_3', title: 'Мобільний зв\'язок - Робочий', category: 'comm', amountUAH: 176.00, amountUSD: 0, payDay: 12, isPaid: true },
+                            { id: 'exp_4', title: 'Apple One', category: 'subscriptions', amountUAH: 629.15, amountUSD: 13.95, payDay: 30, isPaid: false },
+                            { id: 'exp_5', title: 'Verba subtitle app', category: 'subscriptions', amountUAH: 179.95, amountUSD: 3.99, payDay: 2, isPaid: false },
+                            { id: 'exp_6', title: 'Premium', category: 'subscriptions', amountUAH: 89.75, amountUSD: 1.99, payDay: 10, isPaid: false },
+                            { id: 'exp_7', title: 'Lightroom', category: 'subscriptions', amountUAH: 89.75, amountUSD: 1.99, payDay: 7, isPaid: false },
+                            { id: 'exp_8', title: 'Prom для своїх', category: 'subscriptions', amountUAH: 50.00, amountUSD: 0, payDay: 10, isPaid: false },
+                            { id: 'exp_9', title: 'Оренда квартири', category: 'housing', amountUAH: 13500.00, amountUSD: 0, payDay: 10, isPaid: false },
+                            { id: 'exp_10', title: 'Комунальні послуги (електроенергія)', category: 'housing', amountUAH: 281.00, amountUSD: 0, payDay: 10, isPaid: false },
+                            { id: 'exp_11', title: 'Продукти', category: 'food', amountUAH: 10000.00, amountUSD: 0, payDay: 10, isPaid: false },
+                            { id: 'exp_12', title: 'Електроепіляція', category: 'beauty', amountUAH: 8200.00, amountUSD: 0, payDay: 8, isPaid: false },
+                            { id: 'exp_13', title: 'Манікюр', category: 'beauty', amountUAH: 6200.00, amountUSD: 0, payDay: 10, isPaid: false },
+                            { id: 'exp_14', title: 'Додаткові витрати', category: 'other', amountUAH: 1120.00, amountUSD: 0, payDay: 13, isPaid: false },
+                            { id: 'exp_15', title: 'Повернення боргу Владиславі', category: 'debts', amountUAH: 1500.00, amountUSD: 0, payDay: 14, isPaid: false },
+                            { id: 'exp_16', title: 'Розстрочка Samsung M13', category: 'debts', amountUAH: 999.67, amountUSD: 0, payDay: 11, isPaid: false },
+                            { id: 'exp_17', title: 'Електроепіляція (сеанс 2)', category: 'beauty', amountUAH: 10601.00, amountUSD: 0, payDay: 14, isPaid: false },
+                            { id: 'exp_18', title: 'Дверний майстер', category: 'home', amountUAH: 2000.00, amountUSD: 0, payDay: 13, isPaid: true },
+                            { id: 'exp_19', title: 'Чай для Ольги Подологині', category: 'gifts', amountUAH: 500.00, amountUSD: 0, payDay: 10, isPaid: false },
+                            { id: 'exp_20', title: 'Квіти для Ольги Подологині', category: 'gifts', amountUAH: 500.00, amountUSD: 0, payDay: 13, isPaid: false }
+                        ]
+                    },
+                    '2026-11': {
+                        year: 2026,
+                        month: 11,
+                        name: 'Листопад 2026',
+                        salaryDay: 8,
+                        incomeUAH: 72040.96,
+                        incomeUSD: 1600.00,
+                        incomeUSDT: 1600.00,
+                        savingsUAH: 0,
+                        extraIncomeUAH: 0,
+                        incomes: [],
+                        rate: 45.0256,
+                        expenses: [
+                            { id: 'exp_nov_1', title: 'Verba subtitle app', category: 'subscriptions', amountUAH: 179.95, amountUSD: 3.99, payDay: 2, isPaid: false },
+                            { id: 'exp_nov_2', title: 'Lightroom', category: 'subscriptions', amountUAH: 89.75, amountUSD: 1.99, payDay: 7, isPaid: false },
+                            { id: 'exp_nov_3', title: 'Оренда квартири', category: 'housing', amountUAH: 13500.00, amountUSD: 0, payDay: 10, isPaid: false },
+                            { id: 'exp_nov_4', title: 'Продукти', category: 'food', amountUAH: 10000.00, amountUSD: 0, payDay: 10, isPaid: false }
+                        ]
+                    }
+                }
+            };
+            ensurePresetIncomes(state.months['2026-10']);
+            ensurePresetIncomes(state.months['2026-11']);
+            return state;
+        }
+
+        let state = loadState();
+
+        function loadState() {
+            try {
+                const raw = localStorage.getItem(STORAGE_KEY);
+                if (raw) {
+                    const parsed = JSON.parse(raw);
+                    if (parsed && parsed.months) {
+                        Object.keys(parsed.months).forEach(k => ensurePresetIncomes(parsed.months[k]));
+                        return parsed;
+                    }
+                }
+            } catch (e) {
+                console.error('Помилка завантаження стану:', e);
+            }
+            return getDefaultInitialState();
+        }
+
+        function saveState() {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+            } catch (e) {
+                console.error('Помилка збереження стану:', e);
+            }
+        }
+
+        /**
+         * ЗМІННІ ІНТЕРФЕЙСУ ТА ФІЛЬТРІВ
+         */
+        let currentStatusFilter = 'all'; // 'all', 'pending', 'overdue', 'paid'
+        let currentCategoryFilter = 'all';
+        let currentMainTab = 'budget'; // 'budget', 'incomes', 'analytics'
+        let currentAnalyticsMode = 'custom'; // 'custom' або 'presets'
+        let currentAnalyticsPeriod = 'custom'; // 'custom', 'current', '3m', '6m', 'year', 'all'
+        let customDateFrom = '';
+        let customDateTo = '';
+
+        let categoryChartInstance = null;
+        let dynamicsChartInstance = null;
+
+        /**
+         * ІНІЦІАЛІЗАЦІЯ
+         */
+        window.onload = function() {
+            initTheme();
+            updateLiveClock();
+            setInterval(updateLiveClock, 60000);
+
+            populateCategoryDropdowns();
+            initDateRangeInputs();
+            renderAll();
+        };
+
+        function updateLiveClock() {
+            const now = new Date();
+            const monthsUa = ['січня', 'лютого', 'березня', 'квітня', 'травня', 'червня', 'липня', 'серпня', 'вересня', 'жовтня', 'листопада', 'грудня'];
+            const day = now.getDate();
+            const month = monthsUa[now.getMonth()];
+            const year = now.getFullYear();
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+
+            const dateStr = `${day} ${month} ${year}, ${hours}:${minutes}`;
+            const el = document.getElementById('header-today-date');
+            if (el) el.textContent = dateStr;
+        }
+
+        function initTheme() {
+            const savedTheme = localStorage.getItem('finpulse_theme') || 'dark';
+            if (savedTheme === 'light') {
+                document.documentElement.classList.remove('dark');
+                document.documentElement.classList.add('light');
+                document.getElementById('theme-icon').textContent = '☀️';
+            } else {
+                document.documentElement.classList.add('dark');
+                document.documentElement.classList.remove('light');
+                document.getElementById('theme-icon').textContent = '🌙';
+            }
+        }
+
+        function toggleTheme() {
+            const isDark = document.documentElement.classList.contains('dark');
+            if (isDark) {
+                document.documentElement.classList.remove('dark');
+                document.documentElement.classList.add('light');
+                localStorage.setItem('finpulse_theme', 'light');
+                document.getElementById('theme-icon').textContent = '☀️';
+            } else {
+                document.documentElement.classList.remove('light');
+                document.documentElement.classList.add('dark');
+                localStorage.setItem('finpulse_theme', 'dark');
+                document.getElementById('theme-icon').textContent = '🌙';
+            }
+            renderAll();
+        }
+
+        function populateCategoryDropdowns() {
+            const filterSelect = document.getElementById('category-filter');
+            const modalSelect = document.getElementById('modal-category');
+            const incomeCatSelect = document.getElementById('modal-income-category');
+
+            filterSelect.innerHTML = '<option value="all">Усі категорії</option>';
+            modalSelect.innerHTML = '';
+            if (incomeCatSelect) incomeCatSelect.innerHTML = '';
+
+            CATEGORIES.forEach(cat => {
+                filterSelect.innerHTML += `<option value="${cat.id}">${cat.icon} ${cat.name}</option>`;
+                modalSelect.innerHTML += `<option value="${cat.id}">${cat.icon} ${cat.name}</option>`;
+            });
+
+            if (incomeCatSelect) {
+                INCOME_CATEGORIES.forEach(cat => {
+                    incomeCatSelect.innerHTML += `<option value="${cat.id}">${cat.icon} ${cat.name}</option>`;
+                });
+            }
+        }
+
+        function initDateRangeInputs() {
+            const curMonth = state.months[state.activeMonthKey] || { year: 2026, month: 10 };
+            const y = curMonth.year;
+            const m = String(curMonth.month).padStart(2, '0');
+            const lastDay = new Date(y, curMonth.month, 0).getDate();
+
+            customDateFrom = `${y}-${m}-01`;
+            customDateTo = `${y}-${m}-${String(lastDay).padStart(2, '0')}`;
+
+            document.getElementById('custom-date-from').value = customDateFrom;
+            document.getElementById('custom-date-to').value = customDateTo;
+        }
+
+        /**
+         * ПЕРЕМИКАННЯ ГОЛОВНИХ ВКЛАДОК
+         */
+        function switchMainTab(tab) {
+            currentMainTab = tab;
+            const bBtn = document.getElementById('main-tab-budget-btn');
+            const incBtn = document.getElementById('main-tab-incomes-btn');
+            const aBtn = document.getElementById('main-tab-analytics-btn');
+
+            const bContent = document.getElementById('tab-budget-content');
+            const incContent = document.getElementById('tab-incomes-content');
+            const aContent = document.getElementById('tab-analytics-content');
+
+            const activeClass = 'py-1.5 px-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 bg-emerald-500 text-slate-950 shadow-sm truncate';
+            const inactiveClass = 'py-1.5 px-2 rounded-xl text-xs font-semibold transition flex items-center justify-center gap-1 bg-slate-100 dark:bg-darkcard text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-darkborder hover:text-white truncate';
+
+            bBtn.className = tab === 'budget' ? activeClass : inactiveClass;
+            incBtn.className = tab === 'incomes' ? activeClass : inactiveClass;
+            aBtn.className = tab === 'analytics' ? activeClass : inactiveClass;
+
+            bContent.classList.add('hidden');
+            incContent.classList.add('hidden');
+            aContent.classList.add('hidden');
+
+            if (tab === 'budget') {
+                bContent.classList.remove('hidden');
+            } else if (tab === 'incomes') {
+                incContent.classList.remove('hidden');
+                renderIncomesTab();
+            } else if (tab === 'analytics') {
+                aContent.classList.remove('hidden');
+                renderAnalyticsCharts();
+            }
+        }
+
+        /**
+         * ГОЛОВНИЙ РЕНДЕР
+         */
+        function renderAll() {
+            const curMonth = state.months[state.activeMonthKey];
+            if (!curMonth) return;
+
+            ensurePresetIncomes(curMonth);
+
+            if (curMonth.incomeUSDT === undefined) curMonth.incomeUSDT = curMonth.incomeUSD || 1600;
+
+            // Розрахунок доходів
+            const itemsIncomeTotalUAH = curMonth.incomes.reduce((s, inc) => s + (inc.amountUAH || 0), 0);
+            const totalIncomeUAH = curMonth.incomeUAH + itemsIncomeTotalUAH;
+
+            const receivedItemsTotalUAH = curMonth.incomes.filter(inc => inc.isReceived !== false).reduce((s, inc) => s + (inc.amountUAH || 0), 0);
+            const totalReceivedIncomeUAH = curMonth.incomeUAH + receivedItemsTotalUAH;
+
+            document.getElementById('current-month-label').textContent = curMonth.name;
+            document.getElementById('kpi-salary-day').textContent = curMonth.salaryDay;
+            document.getElementById('kpi-income-display').textContent = `${formatCurrency(totalIncomeUAH)} ₴`;
+            document.getElementById('kpi-income-usdt-display').textContent = itemsIncomeTotalUAH > 0 
+                ? `ЗП: ${(curMonth.incomeUSDT || 0).toLocaleString('uk-UA')} ₮ + дод. ${formatCurrency(itemsIncomeTotalUAH)} ₴` 
+                : `${(curMonth.incomeUSDT || 0).toLocaleString('uk-UA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`;
+
+            // Оновлення компактного банера доходів на вкладці бюджету
+            const briefTotal = document.getElementById('incomes-brief-total');
+            const briefBadge = document.getElementById('incomes-brief-badge');
+            if (briefTotal) briefTotal.textContent = `${formatCurrency(totalIncomeUAH)} ₴`;
+            if (briefBadge) {
+                const activeCount = curMonth.incomes.filter(i => (i.amountUAH || 0) > 0).length;
+                briefBadge.textContent = activeCount > 0 ? `ЗП + ${activeCount} надходжень` : `ЗП (${(curMonth.incomeUSDT||0)} ₮)`;
+            }
+
+            let totalPlannedUAH = 0;
+            let totalPaidUAH = 0;
+            let totalPendingUAH = 0;
+            let overdueCount = 0;
+
+            curMonth.expenses.forEach(e => {
+                totalPlannedUAH += e.amountUAH;
+                if (e.isPaid) {
+                    totalPaidUAH += e.amountUAH;
+                } else {
+                    totalPendingUAH += e.amountUAH;
+                    if (isExpenseOverdue(e, curMonth)) {
+                        overdueCount++;
+                    }
+                }
+            });
+
+            // Зарплатний місток до ЗП наступного місяця
+            const nextKey = getNextMonthKey(state.activeMonthKey);
+            const nextMonth = state.months[nextKey];
+            let bridgeItems = [];
+            let bridgeTotalUAH = 0;
+
+            if (nextMonth && Array.isArray(nextMonth.expenses)) {
+                bridgeItems = nextMonth.expenses.filter(e => e.payDay < nextMonth.salaryDay);
+                bridgeItems.forEach(b => {
+                    bridgeTotalUAH += b.amountUAH;
+                });
+            }
+
+            renderBridgeSection(bridgeItems, bridgeTotalUAH, nextMonth);
+
+            // Баланси в реальному часі
+            const inHandUAH = Math.max(0, totalReceivedIncomeUAH - totalPaidUAH);
+            const inHandUSD = curMonth.rate ? (inHandUAH / curMonth.rate) : 0;
+            const remainingToPayUAH = totalPendingUAH + bridgeTotalUAH;
+            const freeBalanceUAH = totalIncomeUAH - (totalPlannedUAH + bridgeTotalUAH);
+            const freeBalanceUSD = curMonth.rate ? (freeBalanceUAH / curMonth.rate) : 0;
+
+            document.getElementById('kpi-in-hand-uah').textContent = `${formatCurrency(inHandUAH)} ₴`;
+            document.getElementById('kpi-in-hand-usd').textContent = `₮${inHandUSD.toFixed(2)}`;
+            document.getElementById('kpi-remaining-to-pay-uah').textContent = `${formatCurrency(remainingToPayUAH)} ₴`;
+            document.getElementById('kpi-free-balance-uah').textContent = `${formatCurrency(freeBalanceUAH)} ₴`;
+            document.getElementById('kpi-free-balance-usd').textContent = `₮${freeBalanceUSD.toFixed(2)} у кінці циклу`;
+
+            // Прогрес бар
+            const totalObligations = totalPlannedUAH + bridgeTotalUAH;
+            const pctPaid = totalObligations > 0 ? Math.min(100, Math.round((totalPaidUAH / totalObligations) * 100)) : 0;
+            const pctPending = totalObligations > 0 ? Math.min(100 - pctPaid, Math.round((remainingToPayUAH / totalObligations) * 100)) : 0;
+
+            document.getElementById('progress-bar-paid').style.width = `${pctPaid}%`;
+            document.getElementById('progress-bar-pending').style.width = `${pctPending}%`;
+            document.getElementById('progress-spent-text').textContent = `${pctPaid}%`;
+            document.getElementById('progress-total-text').textContent = `${formatCurrency(totalObligations)} ₴`;
+
+            // Лічильники фільтрів
+            const pendingCount = curMonth.expenses.filter(e => !e.isPaid).length;
+            const paidCount = curMonth.expenses.filter(e => e.isPaid).length;
+            document.getElementById('count-all').textContent = curMonth.expenses.length;
+            document.getElementById('count-pending').textContent = pendingCount;
+            document.getElementById('count-paid').textContent = paidCount;
+            document.getElementById('count-overdue').textContent = overdueCount;
+
+            // Банер прострочених чекбоксів
+            const overdueBanner = document.getElementById('overdue-alert-banner');
+            if (overdueCount > 0) {
+                const nowDay = new Date().getDate();
+                document.getElementById('overdue-count-badge').textContent = `${overdueCount} очікують`;
+                document.getElementById('overdue-subtext').textContent = `Витрати мали відбутися до ${nowDay}-го числа`;
+                overdueBanner.classList.remove('hidden');
+            } else {
+                overdueBanner.classList.add('hidden');
+            }
+
+            renderExpenses();
+            updateAppModeUI();
+            renderCategorySummary();
+
+            if (currentMainTab === 'incomes') {
+                renderIncomesTab();
+            } else if (currentMainTab === 'analytics') {
+                renderAnalyticsCharts();
+            }
+        }
+
+        /**
+         * РЕНДЕР ОКРЕМОЇ ВКЛАДКИ ДОХОДІВ (ТАБ 2)
+         */
+        function renderIncomesTab() {
+            const curMonth = state.months[state.activeMonthKey];
+            if (!curMonth) return;
+
+            ensurePresetIncomes(curMonth);
+
+            const itemsTotal = curMonth.incomes.reduce((s, i) => s + (i.amountUAH || 0), 0);
+            const totalAllUAH = curMonth.incomeUAH + itemsTotal;
+            const receivedItemsSum = curMonth.incomes.filter(i => i.isReceived !== false).reduce((s, i) => s + (i.amountUAH || 0), 0);
+            const totalReceivedUAH = curMonth.incomeUAH + receivedItemsSum;
+            const pendingToReceiveUAH = Math.max(0, totalAllUAH - totalReceivedUAH);
+
+            // Оновлення KPI карток на вкладці доходів
+            document.getElementById('incomes-tab-month-name').textContent = curMonth.name;
+            document.getElementById('incomes-tab-total-all').textContent = `${formatCurrency(totalAllUAH)} ₴`;
+            document.getElementById('incomes-tab-total-all-usdt').textContent = curMonth.rate ? `~$${(totalAllUAH / curMonth.rate).toFixed(0)}` : '';
+            document.getElementById('incomes-tab-received-sum').textContent = `${formatCurrency(totalReceivedUAH)} ₴`;
+            document.getElementById('incomes-tab-pending-sum').textContent = `${formatCurrency(pendingToReceiveUAH)} ₴`;
+
+            // ЗП рядок
+            document.getElementById('incomes-tab-sal-day-badge').textContent = `${curMonth.salaryDay || 8}-е число`;
+            document.getElementById('incomes-tab-sal-usdt').textContent = `${(curMonth.incomeUSDT || 1600).toLocaleString('uk-UA')} USDT`;
+            document.getElementById('incomes-tab-sal-rate').textContent = `${(curMonth.rate || 45.0256)} ₴/₮`;
+            document.getElementById('incomes-tab-sal-uah').textContent = `${formatCurrency(curMonth.incomeUAH)} ₴`;
+
+            // Рендер груп надходжень
+            const container = document.getElementById('incomes-groups-container');
+            if (!container) return;
+
+            let html = '';
+
+            INCOME_CATEGORIES.forEach(cat => {
+                const items = curMonth.incomes.filter(i => i.category === cat.id);
+                const groupSum = items.reduce((s, i) => s + (i.amountUAH || 0), 0);
+                const receivedCount = items.filter(i => i.isReceived !== false && (i.amountUAH || 0) > 0).length;
+
+                // Особлива дія для заощаджень (кнопка підтягування залишку)
+                const isSavings = cat.id === 'savings';
+                const isDebt = cat.id === 'debt_return';
+
+                html += `
+                    <div class="rounded-2xl p-3.5 bg-white dark:bg-darkcard border border-slate-200 dark:border-slate-800 shadow-sm space-y-2.5">
+                        <div class="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800">
+                            <div class="flex items-center gap-2 min-w-0">
+                                <span class="text-base">${cat.icon}</span>
+                                <div class="min-w-0">
+                                    <div class="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5 flex-wrap">
+                                        <span>${cat.name}</span>
+                                        <span class="px-1.5 py-0.2 rounded-md bg-slate-100 dark:bg-slate-800 text-[9px] font-mono font-bold text-slate-600 dark:text-slate-300">
+                                            ${items.length} ${items.length === 1 ? 'пункт' : 'пунктів'}
+                                        </span>
+                                    </div>
+                                    <div class="text-[9px] text-slate-500 dark:text-slate-400 truncate">${cat.desc}</div>
+                                </div>
+                            </div>
+                            <div class="text-right flex-shrink-0">
+                                <div class="font-mono font-bold text-xs ${groupSum > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}">
+                                    +${formatCurrency(groupSum)} ₴
+                                </div>
+                                <div class="text-[8px] text-slate-400">${receivedCount}/${items.length} отримано</div>
+                            </div>
+                        </div>
+
+                        <!-- СПИСОК ПУНКТІВ У ЦІЙ КАТЕГОРІЇ -->
+                        <div class="space-y-1.5">
+                            ${items.length === 0 ? `
+                                <div class="text-[10px] text-slate-400 text-center py-2 bg-slate-50 dark:bg-slate-900/40 rounded-xl">
+                                    Немає записів. Натисніть «＋ Додати пункт» нижче.
+                                </div>
+                            ` : items.map(item => renderIncomeRow(item)).join('')}
+                        </div>
+
+                        <!-- КНОПКИ ДІЙ ДЛЯ ЦІЄЇ ГРУПИ -->
+                        <div class="flex items-center gap-2 pt-1 border-t border-slate-100 dark:border-slate-800/60">
+                            <button onclick="openIncomeItemModal(null, '${cat.id}')" class="flex-1 py-1 px-2 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-semibold text-[11px] flex items-center justify-center gap-1 transition">
+                                <span>＋ Додати ${isDebt ? 'повернення боргу' : 'пункт'}</span>
+                            </button>
+                            ${isSavings ? `
+                                <button onclick="autofillSavingsDirectly()" class="py-1 px-2.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-[10px] font-medium flex items-center gap-1 transition" title="Взяти чистий залишок попереднього циклу">
+                                    <span>🔄 Взяти залишок</span>
+                                </button>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+        }
+
+        function renderIncomeRow(item) {
+            const isReceived = item.isReceived !== false;
+            const hasAmount = (item.amountUAH || 0) > 0;
+            const isDebt = item.category === 'debt_return';
+
+            return `
+                <div class="group flex items-center gap-2 p-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 text-slate-800 dark:text-slate-100 transition hover:border-emerald-500/40 ${hasAmount ? '' : 'opacity-70'}">
+                    <!-- Чекбокс отримання -->
+                    <button onclick="toggleIncomeReceived('${item.id}')" class="w-5 h-5 flex-shrink-0 rounded-md flex items-center justify-center border transition ${isReceived && hasAmount ? 'bg-emerald-500 border-emerald-500 text-slate-950 font-bold' : 'border-slate-400 dark:border-slate-600 bg-white dark:bg-slate-950 text-transparent'}" title="${isReceived ? 'Отримано на руки' : 'Очікується'}">
+                        ${isReceived && hasAmount ? '✓' : ''}
+                    </button>
+
+                    <!-- Число надходження -->
+                    <span ondblclick="makeIncomeDayEditable(event, '${item.id}')" class="w-6 text-center text-[10px] font-mono text-emerald-700 dark:text-emerald-300 bg-emerald-500/20 rounded py-0.5 font-bold cursor-pointer hover:ring-1 hover:ring-emerald-400 flex-shrink-0" title="Число надходження (Подвійний клік)">${item.day || 1}</span>
+
+                    <!-- Назва та деталі боржника -->
+                    <div class="flex-1 min-w-0 pr-1" onclick="openIncomeItemModal('${item.id}')" role="button">
+                        <div class="text-xs font-semibold truncate ${hasAmount ? (isReceived ? 'text-slate-900 dark:text-white' : 'text-slate-500') : 'text-slate-400'}">
+                            ${item.title}
+                        </div>
+                        ${isDebt && item.debtor ? `
+                            <div class="text-[9px] text-rose-500 dark:text-rose-400 font-medium truncate flex items-center gap-1">
+                                <span>👤 Боржник:</span>
+                                <span class="font-bold">${item.debtor}</span>
+                            </div>
+                        ` : ''}
+                    </div>
+
+                    <!-- Сума надходження -->
+                    <div ondblclick="makeIncomeAmountEditable(event, '${item.id}')" class="text-right flex-shrink-0 cursor-pointer font-mono font-bold text-xs ${hasAmount ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'} hover:text-emerald-500 transition" title="Подвійний клік: змінити суму">
+                        +${formatCurrency(item.amountUAH || 0)} ₴
+                    </div>
+
+                    <!-- Дії -->
+                    <div class="flex items-center gap-1 pl-1">
+                        <button onclick="openIncomeItemModal('${item.id}')" class="p-1 rounded text-slate-400 hover:text-white transition text-xs" title="Редагувати">✏️</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function isExpenseOverdue(expense, curMonth) {
+            const today = new Date();
+            const curYear = today.getFullYear();
+            const curMonthNum = today.getMonth() + 1;
+            const curDay = today.getDate();
+
+            if (curMonth.year < curYear) return true;
+            if (curMonth.year === curYear && curMonth.month < curMonthNum) return true;
+            if (curMonth.year === curYear && curMonth.month === curMonthNum) {
+                return expense.payDay < curDay;
+            }
+            return false;
+        }
+
+        /**
+         * РЕНДЕР СЕКЦІЇ ЗАРПЛАТНОГО МІСТКА
+         */
+        function renderBridgeSection(bridgeItems, bridgeTotalUAH, nextMonth) {
+            const bridgeCard = document.getElementById('bridge-card');
+            const daysRangeEl = document.getElementById('bridge-days-range');
+            const totalDisplayEl = document.getElementById('bridge-total-display');
+            const listEl = document.getElementById('bridge-items-list');
+            if (!bridgeCard || !totalDisplayEl || !listEl) return;
+
+            if (!nextMonth) {
+                if (daysRangeEl) daysRangeEl.textContent = 'Наступний місяць';
+                totalDisplayEl.textContent = '0.00 ₴';
+                listEl.innerHTML = '<div class="text-[10px] text-slate-400 text-center py-1">Немає наступного циклу</div>';
+                return;
+            }
+
+            const salDay = nextMonth.salaryDay || 8;
+            if (daysRangeEl) {
+                daysRangeEl.textContent = salDay > 1 ? `1–${salDay - 1} ${nextMonth.name.toLowerCase()}` : `ЗП 1-го числа`;
+            }
+            totalDisplayEl.textContent = `${formatCurrency(bridgeTotalUAH)} ₴`;
+
+            if (bridgeItems.length === 0) {
+                listEl.innerHTML = '<div class="text-[10px] text-slate-400 text-center py-1">Немає витрат до ЗП наступного місяця</div>';
+            } else {
+                listEl.innerHTML = bridgeItems.map(item => {
+                    const cat = CATEGORIES.find(c => c.id === item.category) || { icon: '⚡', name: 'Інше' };
+                    return `
+                        <div class="flex items-center justify-between text-xs py-1.5 px-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-slate-800 dark:text-amber-200">
+                            <div class="flex items-center gap-2 min-w-0">
+                                <span class="w-5 text-center text-[10px] font-mono font-bold bg-amber-500/20 rounded py-0.5">${item.payDay}</span>
+                                <span>${cat.icon}</span>
+                                <span class="truncate font-medium">${item.title}</span>
+                            </div>
+                            <div class="font-mono font-bold text-xs flex-shrink-0">
+                                ${formatCurrency(item.amountUAH)} ₴
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+        }
+
+        /**
+         * РЕНДЕР СЕКЦІЇ НАДХОДЖЕНЬ
+         */
+        function toggleIncomesDetails() {
+            const body = document.getElementById('incomes-body');
+            const arrow = document.getElementById('incomes-toggle-arrow');
+            body.classList.toggle('hidden');
+            arrow.classList.toggle('rotate-180');
+        }
+
+        function renderIncomesSection(curMonth, totalIncomeUAH, itemsIncomeTotalUAH) {
+            const countBadge = document.getElementById('incomes-count-badge');
+            const totalSummary = document.getElementById('incomes-total-summary');
+            const extraSummary = document.getElementById('incomes-extra-summary');
+            const chipsContainer = document.getElementById('incomes-chips-container');
+            const itemsList = document.getElementById('incomes-items-list');
+            const isLight = document.documentElement.classList.contains('light');
+
+            const activeItemsCount = (curMonth.incomes || []).filter(i => (i.amountUAH || 0) > 0).length;
+            countBadge.textContent = activeItemsCount > 0 ? `ЗП + ${activeItemsCount} активних` : 'ЗП + 4 статті (0 ₴)';
+            totalSummary.textContent = `${formatCurrency(totalIncomeUAH)} ₴`;
+            extraSummary.textContent = itemsIncomeTotalUAH > 0 ? `(додатково +${formatCurrency(itemsIncomeTotalUAH)} ₴)` : '';
+
+            // Чіпси структури доходу (ЗП + 4 обов'язкові статті)
+            const catSums = {};
+            (curMonth.incomes || []).forEach(inc => {
+                catSums[inc.category] = (catSums[inc.category] || 0) + (inc.amountUAH || 0);
+            });
+
+            let chipsHtml = `
+                <div class="p-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-mono">
+                    <span class="block text-[8px] text-slate-500 dark:text-slate-400">💼 ЗП (Binance)</span>
+                    <span class="font-bold">${formatCurrency(curMonth.incomeUAH)} ₴</span>
+                </div>
+                <div class="p-1.5 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-cyan-600 dark:text-cyan-400 font-mono">
+                    <span class="block text-[8px] text-slate-500 dark:text-slate-400">🏦 Заощадження</span>
+                    <span class="font-bold">${formatCurrency(catSums['savings'] || 0)} ₴</span>
+                </div>
+                <div class="p-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 font-mono">
+                    <span class="block text-[8px] text-slate-500 dark:text-slate-400">⚡ Дод. заробіток</span>
+                    <span class="font-bold">${formatCurrency(catSums['extra'] || 0)} ₴</span>
+                </div>
+                <div class="p-1.5 rounded-lg bg-purple-500/10 border border-purple-500/20 text-purple-600 dark:text-purple-400 font-mono">
+                    <span class="block text-[8px] text-slate-500 dark:text-slate-400">🕊️ Благодійність</span>
+                    <span class="font-bold">${formatCurrency(catSums['charity_in'] || 0)} ₴</span>
+                </div>
+                <div class="p-1.5 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 font-mono">
+                    <span class="block text-[8px] text-slate-500 dark:text-slate-400">🤝 Повернення боргів</span>
+                    <span class="font-bold">${formatCurrency(catSums['debt_return'] || 0)} ₴</span>
+                </div>
+            `;
+
+            // Якщо є інші довільні категорії надходжень
+            Object.keys(catSums).forEach(catId => {
+                if (!['savings', 'extra', 'charity_in', 'debt_return'].includes(catId)) {
+                    const catObj = INCOME_CATEGORIES.find(c => c.id === catId) || { icon: '💵', name: 'Надходження' };
+                    chipsHtml += `
+                        <div class="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 font-mono">
+                            <span class="block text-[8px] text-slate-500 dark:text-slate-400 truncate">${catObj.icon} ${catObj.name}</span>
+                            <span class="font-bold text-slate-800 dark:text-slate-200">${formatCurrency(catSums[catId])} ₴</span>
+                        </div>
+                    `;
+                }
+            });
+
+            chipsContainer.innerHTML = chipsHtml;
+
+            // Рендер рядків надходжень
+            itemsList.innerHTML = (curMonth.incomes || []).map(inc => {
+                const cat = INCOME_CATEGORIES.find(c => c.id === inc.category) || { icon: '💵', name: 'Дохід' };
+                const isReceived = inc.isReceived !== false;
+                const hasAmount = (inc.amountUAH || 0) > 0;
+                const itemClass = isLight 
+                    ? 'bg-white border-emerald-200 text-slate-800' 
+                    : 'bg-darkcard border-emerald-500/30 text-slate-100';
+
+                return `
+                    <div class="flex items-center gap-2 text-xs py-1.5 px-2 rounded-xl border ${itemClass} transition ${hasAmount ? '' : 'opacity-70'}">
+                        <button onclick="toggleIncomeReceived('${inc.id}')" class="w-5 h-5 flex-shrink-0 rounded-md flex items-center justify-center border transition ${isReceived && hasAmount ? 'bg-emerald-500 border-emerald-500 text-slate-950 font-bold' : 'border-slate-400 dark:border-slate-600 bg-slate-100 dark:bg-slate-900 text-transparent'}" title="${isReceived ? 'Отримано' : 'Очікується'}">
+                            ${isReceived && hasAmount ? '✓' : ''}
+                        </button>
+                        <span class="w-6 text-center text-[10px] font-mono text-emerald-700 dark:text-emerald-300 bg-emerald-500/20 rounded py-0.5 font-bold cursor-pointer" onclick="openIncomeItemModal('${inc.id}')" title="Число надходження">${inc.day || 1}</span>
+                        <span class="text-xs" title="${cat.name}">${cat.icon}</span>
+                        <div class="flex-1 min-w-0" onclick="openIncomeItemModal('${inc.id}')" role="button">
+                            <div class="truncate font-medium text-xs ${hasAmount ? (isReceived ? '' : 'text-slate-400 italic') : 'text-slate-400'}">${inc.title}</div>
+                            <div class="text-[9px] text-slate-400">${cat.name}</div>
+                        </div>
+                        <div ondblclick="makeIncomeAmountEditable(event, '${inc.id}')" class="text-right flex-shrink-0 font-mono font-bold text-xs ${hasAmount ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400 dark:text-slate-500'} cursor-pointer hover:text-emerald-500 transition" title="Подвійний клік: змінити суму">
+                            +${formatCurrency(inc.amountUAH || 0)} ₴
+                        </div>
+                        <button onclick="openIncomeItemModal('${inc.id}')" class="p-1 rounded-md text-slate-400 hover:text-white transition text-xs" title="Редагувати або вказати суму">
+                            ✏️
+                        </button>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function toggleBridgeDetails() {
+            const list = document.getElementById('bridge-items-list');
+            const arrow = document.getElementById('bridge-toggle-arrow');
+            list.classList.toggle('hidden');
+            arrow.classList.toggle('rotate-180');
+        }
+
+        /**
+         * РЕНДЕР СПИСКУ ВИТРАТ
+         */
+        function renderExpenses() {
+            const curMonth = state.months[state.activeMonthKey];
+            const container = document.getElementById('expenses-container');
+            if (!curMonth || !container) return;
+
+            let filtered = curMonth.expenses.slice();
+
+            // Фільтр за категорією
+            if (currentCategoryFilter !== 'all') {
+                filtered = filtered.filter(e => e.category === currentCategoryFilter);
+            }
+
+            // Фільтр за статусом
+            if (currentStatusFilter === 'pending') {
+                filtered = filtered.filter(e => !e.isPaid);
+            } else if (currentStatusFilter === 'paid') {
+                filtered = filtered.filter(e => e.isPaid);
+            } else if (currentStatusFilter === 'overdue') {
+                filtered = filtered.filter(e => !e.isPaid && isExpenseOverdue(e, curMonth));
+            }
+
+            if (filtered.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-10 px-4 rounded-2xl border border-dashed border-slate-300 dark:border-slate-800">
+                        <span class="text-3xl block mb-2">📭</span>
+                        <div class="text-xs font-bold text-slate-700 dark:text-slate-300">Немає витрат за цим фільтром</div>
+                        <p class="text-[10px] text-slate-500 mt-1">Змініть параметри фільтрації або додайте нову статтю витрат.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            // Групування за розділами
+            let html = '';
+            SECTIONS.forEach(sec => {
+                const secItems = filtered.filter(e => {
+                    const catObj = CATEGORIES.find(c => c.id === e.category);
+                    return catObj && catObj.section === sec.id;
+                });
+
+                if (secItems.length === 0) return;
+
+                secItems.sort((a, b) => a.payDay - b.payDay);
+
+                const secTotal = secItems.reduce((s, e) => s + e.amountUAH, 0);
+                const secPaidCount = secItems.filter(e => e.isPaid).length;
+
+                html += `
+                    <div class="space-y-1.5">
+                        <div class="flex items-center justify-between text-xs font-bold pt-2 pb-1 border-b border-slate-200 dark:border-slate-800">
+                            <span class="flex items-center gap-1.5 text-slate-700 dark:text-slate-300">
+                                <span>${sec.icon}</span>
+                                <span>${sec.title.toUpperCase()}</span>
+                            </span>
+                            <span class="text-[11px] font-mono text-emerald-600 dark:text-emerald-400">
+                                ${formatCurrency(secTotal)} ₴ <span class="text-slate-400 text-[10px] font-normal">(${secPaidCount}/${secItems.length})</span>
+                            </span>
+                        </div>
+                        <div class="space-y-1">
+                            ${secItems.map(item => renderExpenseRow(item, curMonth)).join('')}
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+        }
+
+        function renderExpenseRow(item, curMonth) {
+            const cat = CATEGORIES.find(c => c.id === item.category) || { icon: '⚡', name: 'Інше', color: '#10b981' };
+            const isOverdue = !item.isPaid && isExpenseOverdue(item, curMonth);
+            const isEdit = state.appMode === 'edit';
+
+            const checkboxBorder = isOverdue 
+                ? 'border-amber-400 ring-2 ring-amber-400/50 pulse-overdue' 
+                : (item.isPaid ? 'border-emerald-500 bg-emerald-500 text-slate-950 font-bold' : 'border-slate-400 dark:border-slate-600 bg-slate-100 dark:bg-slate-900 text-transparent');
+
+            const rowOpacity = item.isPaid ? 'opacity-65' : 'opacity-100';
+
+            return `
+                <div class="expense-row group flex items-center justify-between gap-2 p-2 rounded-xl border border-slate-200 dark:border-slate-800/80 bg-white dark:bg-darkcard text-slate-800 dark:text-slate-100 transition shadow-sm ${rowOpacity}">
+                    <!-- Чекбокс оплати -->
+                    <button onclick="toggleExpensePaid('${item.id}')" class="w-5 h-5 flex-shrink-0 rounded-md flex items-center justify-center border transition ${checkboxBorder}" title="${item.isPaid ? 'Сплачено' : (isOverdue ? 'Минула дата! Сплатити?' : 'Очікує оплати')}">
+                        ${item.isPaid ? '✓' : (isOverdue ? '!' : '')}
+                    </button>
+
+                    <!-- Число місяця -->
+                    <span ondblclick="makeDayEditable(event, '${item.id}')" class="w-6 text-center text-[10px] font-mono text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 rounded py-0.5 font-bold cursor-pointer hover:ring-1 hover:ring-emerald-400" title="Подвійний клік: змінити число">${item.payDay}</span>
+
+                    <!-- Іконка категорії -->
+                    <span ondblclick="makeCategoryEditable(event, '${item.id}')" class="text-xs cursor-pointer hover:scale-125 transition-transform" title="${cat.name} (Подвійний клік: змінити)">${cat.icon}</span>
+
+                    <!-- Назва витрати -->
+                    <div class="flex-1 min-w-0 pr-1">
+                        <div ondblclick="makeTitleEditable(event, '${item.id}')" class="text-xs font-medium truncate cursor-pointer hover:text-emerald-500 transition select-text ${item.isPaid ? 'line-through text-slate-400' : ''}" title="Подвійний клік для швидкого редагування">
+                            ${item.title}
+                        </div>
+                    </div>
+
+                    <!-- Сума у ₴ та $ -->
+                    <div ondblclick="makeAmountEditable(event, '${item.id}')" class="text-right flex-shrink-0 cursor-pointer hover:text-emerald-400" title="Подвійний клік: змінити суму">
+                        <div class="text-xs font-bold font-mono text-slate-900 dark:text-white">${formatCurrency(item.amountUAH)} ₴</div>
+                        ${item.amountUSD > 0 ? `<div class="text-[9px] text-slate-400 font-mono">$${item.amountUSD.toFixed(2)}</div>` : ''}
+                    </div>
+
+                    <!-- Кнопки швидких дій у режимі редагування -->
+                    ${isEdit ? `
+                        <div class="flex items-center gap-1 pl-1 border-l border-slate-200 dark:border-slate-800">
+                            <button onclick="duplicateExpense('${item.id}')" class="p-1 rounded text-slate-400 hover:text-white transition text-[11px]" title="Дублювати статтю">📋</button>
+                            <button onclick="openExpenseModal('${item.id}')" class="p-1 rounded text-slate-400 hover:text-white transition text-[11px]" title="Редагувати">✏️</button>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        }
+
+        /**
+         * ІНЛАЙН РЕДАГУВАННЯ ПОДВІЙНИМ КЛІКОМ
+         */
+        function makeTitleEditable(e, id) {
+            e.stopPropagation();
+            const curMonth = state.months[state.activeMonthKey];
+            const item = curMonth.expenses.find(x => x.id === id);
+            if (!item) return;
+
+            const el = e.currentTarget;
+            const currentTitle = item.title;
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.value = currentTitle;
+            input.className = 'w-full px-1.5 py-0.5 text-xs bg-slate-900 text-white border border-emerald-500 rounded outline-none font-medium';
+
+            const finish = () => {
+                const val = input.value.trim();
+                if (val && val !== currentTitle) {
+                    item.title = val;
+                    saveState();
+                    renderAll();
+                    showToast('Назву оновлено', '✏️');
+                } else {
+                    renderAll();
+                }
+            };
+
+            input.onblur = finish;
+            input.onkeydown = (ev) => {
+                if (ev.key === 'Enter') finish();
+                if (ev.key === 'Escape') renderAll();
+            };
+
+            el.innerHTML = '';
+            el.appendChild(input);
+            input.focus();
+            input.select();
+        }
+
+        function makeDayEditable(e, id) {
+            e.stopPropagation();
+            const curMonth = state.months[state.activeMonthKey];
+            const item = curMonth.expenses.find(x => x.id === id);
+            if (!item) return;
+
+            const el = e.currentTarget;
+            const input = document.createElement('input');
+            input.type = 'number';
+            input.min = '1';
+            input.max = '31';
+            input.value = item.payDay;
+            input.className = 'w-8 px-0.5 py-0 text-[10px] bg-slate-900 text-white border border-emerald-500 rounded outline-none font-mono text-center';
+
+            const finish = () => {
+                const val = parseInt(input.value);
+                if (val >= 1 && val <= 31) {
+                    item.payDay = val;
+                    saveState();
+                    renderAll();
+                    showToast('День змінено на ' + val, '📅');
+                } else {
+                    renderAll();
+                }
+            };
+
+            input.onblur = finish;
+            input.onkeydown = (ev) => {
+                if (ev.key === 'Enter') finish();
+                if (ev.key === 'Escape') renderAll();
+            };
+
+            el.innerHTML = '';
+            el.appendChild(input);
+            input.focus();
+            input.select();
+        }
+
+        function makeCategoryEditable(e, id) {
+            e.stopPropagation();
+            const curMonth = state.months[state.activeMonthKey];
+            const item = curMonth.expenses.find(x => x.id === id);
+            if (!item) return;
+
+            const el = e.currentTarget;
+            const select = document.createElement('select');
+            select.className = 'text-xs bg-slate-900 text-white border border-emerald-500 rounded outline-none';
+
+            CATEGORIES.forEach(cat => {
+                const opt = document.createElement('option');
+                opt.value = cat.id;
+                opt.textContent = `${cat.icon} ${cat.name}`;
+                if (cat.id === item.category) opt.selected = true;
+                select.appendChild(opt);
+            });
+
+            select.onchange = () => {
+                item.category = select.value;
+                saveState();
+                renderAll();
+                showToast('Категорію оновлено', '🏷️');
+            };
+
+            select.onblur = () => renderAll();
+
+            el.innerHTML = '';
+            el.appendChild(select);
+            select.focus();
+        }
+
+        function makeAmountEditable(e, id) {
+            e.stopPropagation();
+            const curMonth = state.months[state.activeMonthKey];
+            const item = curMonth.expenses.find(x => x.id === id);
+            if (!item) return;
+
+            const el = e.currentTarget;
+            const input = document.createElement('input');
+            input.type = 'number';
+            input.step = '0.01';
+            input.value = item.amountUAH;
+            input.className = 'w-20 px-1 py-0.5 text-xs bg-slate-900 text-white border border-emerald-500 rounded outline-none font-mono text-right';
+
+            const finish = () => {
+                const val = parseFloat(input.value);
+                if (!isNaN(val) && val >= 0) {
+                    item.amountUAH = val;
+                    if (item.amountUSD > 0 && curMonth.rate) {
+                        item.amountUSD = +(val / curMonth.rate).toFixed(2);
+                    }
+                    saveState();
+                    renderAll();
+                    showToast('Суму оновлено', '💰');
+                } else {
+                    renderAll();
+                }
+            };
+
+            input.onblur = finish;
+            input.onkeydown = (ev) => {
+                if (ev.key === 'Enter') finish();
+                if (ev.key === 'Escape') renderAll();
+            };
+
+            el.innerHTML = '';
+            el.appendChild(input);
+            input.focus();
+            input.select();
+        }
+
+        /**
+         * ЧЕКБОКСИ ТА ДІЇ З ВИТРАТАМИ
+         */
+        function toggleExpensePaid(id) {
+            const curMonth = state.months[state.activeMonthKey];
+            if (!curMonth) return;
+
+            const item = curMonth.expenses.find(e => e.id === id);
+            if (item) {
+                item.isPaid = !item.isPaid;
+                saveState();
+                renderAll();
+                showToast(item.isPaid ? `Сплачено: ${item.title}` : `Скасовано оплату: ${item.title}`, item.isPaid ? '✅' : '⏳');
+            }
+        }
+
+        function duplicateExpense(id) {
+            const curMonth = state.months[state.activeMonthKey];
+            if (!curMonth) return;
+
+            const item = curMonth.expenses.find(e => e.id === id);
+            if (item) {
+                const newItem = {
+                    ...JSON.parse(JSON.stringify(item)),
+                    id: 'exp_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 4),
+                    isPaid: false
+                };
+                curMonth.expenses.push(newItem);
+                saveState();
+                renderAll();
+                showToast(`Здубльовано: ${item.title}`, '📋');
+            }
+        }
+
+        function setStatusFilter(status) {
+            currentStatusFilter = status;
+            document.querySelectorAll('.filter-status-btn').forEach(btn => {
+                btn.className = 'filter-status-btn px-2.5 py-1 rounded-xl bg-slate-200 dark:bg-darkcard text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-darkborder transition';
+            });
+            const activeBtn = document.getElementById(`filter-btn-${status}`);
+            if (activeBtn) {
+                activeBtn.className = 'filter-status-btn px-2.5 py-1 rounded-xl font-bold bg-emerald-500 text-slate-950 transition';
+            }
+            renderExpenses();
+        }
+
+        function filterByOverdueOnly() {
+            setStatusFilter('overdue');
+        }
+
+        function onCategoryFilterChange() {
+            currentCategoryFilter = document.getElementById('category-filter').value;
+            renderCategorySummary();
+            renderExpenses();
+        }
+
+        function renderCategorySummary() {
+            const curMonth = state.months[state.activeMonthKey];
+            if (!curMonth) return;
+
+            const titleEl = document.getElementById('cat-summary-title');
+            const iconEl = document.getElementById('cat-summary-icon');
+            const totalEl = document.getElementById('cat-summary-total');
+            const spentEl = document.getElementById('cat-summary-spent');
+            const remEl = document.getElementById('cat-summary-remaining');
+            const pctEl = document.getElementById('cat-summary-pct');
+            const barEl = document.getElementById('cat-summary-progress');
+
+            let items = curMonth.expenses;
+            if (currentCategoryFilter !== 'all') {
+                const catObj = CATEGORIES.find(c => c.id === currentCategoryFilter);
+                titleEl.textContent = catObj ? catObj.name : 'Категорія';
+                iconEl.textContent = catObj ? catObj.icon : '🏷️';
+                items = items.filter(e => e.category === currentCategoryFilter);
+            } else {
+                titleEl.textContent = 'Усі категорії місяця';
+                iconEl.textContent = '📊';
+            }
+
+            const total = items.reduce((s, e) => s + e.amountUAH, 0);
+            const spent = items.filter(e => e.isPaid).reduce((s, e) => s + e.amountUAH, 0);
+            const rem = items.filter(e => !e.isPaid).reduce((s, e) => s + e.amountUAH, 0);
+            const pct = total > 0 ? Math.round((spent / total) * 100) : 0;
+
+            totalEl.textContent = `${formatCurrency(total)} ₴`;
+            spentEl.textContent = `${formatCurrency(spent)} ₴`;
+            remEl.textContent = `${formatCurrency(rem)} ₴`;
+            pctEl.textContent = `${pct}% сплачено`;
+            barEl.style.width = `${pct}%`;
+        }
+
+        function setAppMode(mode) {
+            state.appMode = mode;
+            saveState();
+            updateAppModeUI();
+            renderExpenses();
+        }
+
+        function updateAppModeUI() {
+            const viewBtn = document.getElementById('mode-view-btn');
+            const editBtn = document.getElementById('mode-edit-btn');
+            const actionsPanel = document.getElementById('edit-actions-panel');
+
+            if (state.appMode === 'edit') {
+                editBtn.className = 'px-2.5 py-1.5 rounded-lg bg-emerald-500 text-slate-950 font-bold transition flex items-center gap-1 text-[11px] shadow-sm';
+                viewBtn.className = 'px-2.5 py-1.5 rounded-lg text-slate-600 dark:text-slate-300 transition flex items-center gap-1 text-[11px]';
+                actionsPanel.classList.remove('hidden');
+            } else {
+                viewBtn.className = 'px-2.5 py-1.5 rounded-lg bg-slate-300 dark:bg-slate-700 text-slate-900 dark:text-white font-bold transition flex items-center gap-1 text-[11px] shadow-sm';
+                editBtn.className = 'px-2.5 py-1.5 rounded-lg text-slate-600 dark:text-slate-300 transition flex items-center gap-1 text-[11px]';
+                actionsPanel.classList.add('hidden');
+            }
+        }
+
+        /**
+         * КЕРУВАННЯ МІСЯЦЯМИ
+         */
+        function prevMonth() {
+            const keys = Object.keys(state.months).sort();
+            const idx = keys.indexOf(state.activeMonthKey);
+            if (idx > 0) {
+                state.activeMonthKey = keys[idx - 1];
+                saveState();
+                renderAll();
+            } else {
+                showToast('Це найперший збережений місяць', 'ℹ️');
+            }
+        }
+
+        function nextMonth() {
+            const keys = Object.keys(state.months).sort();
+            const idx = keys.indexOf(state.activeMonthKey);
+            if (idx < keys.length - 1) {
+                state.activeMonthKey = keys[idx + 1];
+                saveState();
+                renderAll();
+            } else {
+                const nextKey = getNextMonthKey(state.activeMonthKey);
+                if (!state.months[nextKey]) {
+                    cloneMonthToNext();
+                } else {
+                    state.activeMonthKey = nextKey;
+                    saveState();
+                    renderAll();
+                }
+            }
+        }
+
+        function toggleMonthDropdown() {
+            const dd = document.getElementById('months-dropdown');
+            if (!dd.classList.contains('hidden')) {
+                dd.classList.add('hidden');
+                return;
+            }
+
+            const keys = Object.keys(state.months).sort();
+            dd.innerHTML = keys.map(k => {
+                const m = state.months[k];
+                const isAct = k === state.activeMonthKey;
+                return `
+                    <div onclick="selectMonthKey('${k}')" class="p-2 rounded-xl text-xs flex items-center justify-between cursor-pointer transition ${isAct ? 'bg-emerald-500 text-slate-950 font-bold' : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200'}">
+                        <span>${m.name}</span>
+                        <span class="font-mono text-[10px] opacity-80">${m.expenses.length} витрат</span>
+                    </div>
+                `;
+            }).join('');
+
+            dd.classList.remove('hidden');
+        }
+
+        function selectMonthKey(key) {
+            state.activeMonthKey = key;
+            saveState();
+            document.getElementById('months-dropdown').classList.add('hidden');
+            renderAll();
+        }
+
+        function getNextMonthKey(key) {
+            const [y, m] = key.split('-').map(Number);
+            if (m === 12) return `${y + 1}-01`;
+            return `${y}-${String(m + 1).padStart(2, '0')}`;
+        }
+
+        function getPrevMonthKey(key) {
+            const [y, m] = key.split('-').map(Number);
+            if (m === 1) return `${y - 1}-12`;
+            return `${y}-${String(m - 1).padStart(2, '0')}`;
+        }
+
+        function cloneMonthToNext() {
+            const curMonth = state.months[state.activeMonthKey];
+            if (!curMonth) return;
+
+            const nextKey = getNextMonthKey(state.activeMonthKey);
+            const [nextY, nextM] = nextKey.split('-').map(Number);
+            const monthNamesUa = ['Січень', 'Лютий', 'Березень', 'Квітень', 'Травень', 'Червень', 'Липень', 'Серпень', 'Вересень', 'Жовтень', 'Листопад', 'Грудень'];
+            const nextName = `${monthNamesUa[nextM - 1]} ${nextY}`;
+
+            // Копіювання статей зі скиданням чеків
+            const clonedExpenses = curMonth.expenses.map(e => ({
+                ...e,
+                id: 'exp_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 4),
+                isPaid: false
+            }));
+
+            // Розрахунок залишку поточного місяця для автоматичного встановлення в заощадження наступного
+            let curPlanned = (curMonth.expenses || []).reduce((s, e) => s + e.amountUAH, 0);
+            let nextBridge = clonedExpenses.filter(e => e.payDay < curMonth.salaryDay).reduce((s, e) => s + e.amountUAH, 0);
+            let curExtra = (curMonth.incomes || []).reduce((s, i) => s + (i.amountUAH || 0), 0);
+            let curTotalInc = (curMonth.incomeUAH || 0) + curExtra;
+            let autoSavings = Math.max(0, curTotalInc - (curPlanned + nextBridge));
+
+            state.months[nextKey] = {
+                year: nextY,
+                month: nextM,
+                name: nextName,
+                salaryDay: curMonth.salaryDay,
+                incomeUAH: curMonth.incomeUAH,
+                incomeUSD: curMonth.incomeUSD,
+                incomeUSDT: curMonth.incomeUSDT,
+                savingsUAH: autoSavings,
+                extraIncomeUAH: 0,
+                incomes: [],
+                rate: curMonth.rate,
+                expenses: clonedExpenses
+            };
+
+            ensurePresetIncomes(state.months[nextKey]);
+            state.activeMonthKey = nextKey;
+            saveState();
+            renderAll();
+            showToast(`Створено та перенесено на ${nextName}`, '🚀');
+        }
+
+        /**
+         * АНАЛІТИКА ТА ДІАГРАМИ
+         */
+        function setAnalyticsMode(mode) {
+            currentAnalyticsMode = mode;
+            const btnCustom = document.getElementById('btn-period-type-custom');
+            const btnPresets = document.getElementById('btn-period-type-presets');
+            const customPanel = document.getElementById('custom-date-range-panel');
+            const presetsPanel = document.getElementById('quick-presets-panel');
+
+            if (mode === 'custom') {
+                btnCustom.className = 'flex-1 py-1.5 px-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 bg-emerald-500 text-slate-950 shadow-sm';
+                btnPresets.className = 'flex-1 py-1.5 px-2 rounded-xl text-xs font-medium transition flex items-center justify-center gap-1 text-slate-600 dark:text-slate-400 hover:text-white';
+                customPanel.classList.remove('hidden');
+                presetsPanel.classList.add('hidden');
+                currentAnalyticsPeriod = 'custom';
+            } else {
+                btnPresets.className = 'flex-1 py-1.5 px-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 bg-emerald-500 text-slate-950 shadow-sm';
+                btnCustom.className = 'flex-1 py-1.5 px-2 rounded-xl text-xs font-medium transition flex items-center justify-center gap-1 text-slate-600 dark:text-slate-400 hover:text-white';
+                customPanel.classList.add('hidden');
+                presetsPanel.classList.remove('hidden');
+                currentAnalyticsPeriod = 'current';
+            }
+            renderAnalyticsCharts();
+        }
+
+        function setAnalyticsPeriod(period) {
+            currentAnalyticsPeriod = period;
+            document.querySelectorAll('.period-btn').forEach(b => {
+                if (b.dataset.period === period) {
+                    b.className = 'period-btn px-2.5 py-1 rounded-xl font-bold bg-emerald-500 text-slate-950 transition';
+                } else {
+                    b.className = 'period-btn px-2.5 py-1 rounded-xl bg-slate-200 dark:bg-darkcard text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-darkborder transition';
+                }
+            });
+            renderAnalyticsCharts();
+        }
+
+        function applyCustomDateRange() {
+            customDateFrom = document.getElementById('custom-date-from').value;
+            customDateTo = document.getElementById('custom-date-to').value;
+            currentAnalyticsPeriod = 'custom';
+            renderAnalyticsCharts();
+        }
+
+        function setCustomPreset(type) {
+            const curMonth = state.months[state.activeMonthKey] || { year: 2026, month: 10, salaryDay: 8 };
+            const y = curMonth.year;
+            const m = curMonth.month;
+            const salDay = curMonth.salaryDay || 8;
+
+            if (type === 'cycle') {
+                const prevM = m === 1 ? 12 : m - 1;
+                const prevY = m === 1 ? y - 1 : y;
+                customDateFrom = `${prevY}-${String(prevM).padStart(2, '0')}-${String(salDay).padStart(2, '0')}`;
+                customDateTo = `${y}-${String(m).padStart(2, '0')}-${String(salDay - 1).padStart(2, '0')}`;
+            } else if (type === 'month') {
+                const lastD = new Date(y, m, 0).getDate();
+                customDateFrom = `${y}-${String(m).padStart(2, '0')}-01`;
+                customDateTo = `${y}-${String(m).padStart(2, '0')}-${String(lastD).padStart(2, '0')}`;
+            } else if (type === 'today') {
+                const today = new Date();
+                const curY = today.getFullYear();
+                const curM = today.getMonth() + 1;
+                const curD = today.getDate();
+                customDateFrom = `${curY}-${String(curM).padStart(2, '0')}-01`;
+                customDateTo = `${curY}-${String(curM).padStart(2, '0')}-${String(curD).padStart(2, '0')}`;
+            }
+
+            document.getElementById('custom-date-from').value = customDateFrom;
+            document.getElementById('custom-date-to').value = customDateTo;
+            applyCustomDateRange();
+        }
+
+        function renderAnalyticsCharts() {
+            if (typeof Chart === 'undefined') return;
+
+            const badgeEl = document.getElementById('analytics-period-badge');
+            let filteredExpenses = [];
+            let totalIncome = 0;
+            let totalIncomeUSD = 0;
+            let labelPeriod = '';
+
+            const allKeys = Object.keys(state.months).sort();
+            const curMonth = state.months[state.activeMonthKey] || { rate: 45.0256 };
+
+            if (currentAnalyticsPeriod === 'custom') {
+                const fromD = customDateFrom ? new Date(customDateFrom + 'T00:00:00') : new Date('2020-01-01');
+                const toD = customDateTo ? new Date(customDateTo + 'T23:59:59') : new Date('2035-12-31');
+
+                const formatD = (dStr) => {
+                    if (!dStr) return '...';
+                    const [y, m, d] = dStr.split('-');
+                    return `${d}.${m}.${y}`;
+                };
+                labelPeriod = `${formatD(customDateFrom)} — ${formatD(customDateTo)}`;
+
+                allKeys.forEach(k => {
+                    const m = state.months[k];
+                    if (!m) return;
+
+                    const salD = new Date(m.year, m.month - 1, m.salaryDay || 8);
+                    if (salD >= fromD && salD <= toD) {
+                        const mExtra = (m.savingsUAH || 0) + (m.extraIncomeUAH || 0);
+                        totalIncome += ((m.incomeUAH || 0) + mExtra);
+                        const incUsd = m.incomeUSDT !== undefined ? m.incomeUSDT : (m.incomeUSD !== undefined ? m.incomeUSD : (m.rate ? m.incomeUAH / m.rate : 0));
+                        totalIncomeUSD += incUsd;
+                    }
+
+                    (m.incomes || []).forEach(inc => {
+                        const incD = new Date(m.year, m.month - 1, inc.day || 1);
+                        if (incD >= fromD && incD <= toD) {
+                            totalIncome += (inc.amountUAH || 0);
+                            if (m.rate > 0) totalIncomeUSD += (inc.amountUAH / m.rate);
+                        }
+                    });
+
+                    (m.expenses || []).forEach(e => {
+                        const expD = new Date(m.year, m.month - 1, e.payDay);
+                        if (expD >= fromD && expD <= toD) {
+                            filteredExpenses.push({ ...e, monthKey: k, monthRate: m.rate, expenseDate: expD });
+                        }
+                    });
+                });
+            } else {
+                let selectedMonths = [];
+                const curIdx = allKeys.indexOf(state.activeMonthKey);
+                const activeIdx = curIdx >= 0 ? curIdx : allKeys.length - 1;
+
+                if (currentAnalyticsPeriod === 'current') {
+                    selectedMonths = [state.months[state.activeMonthKey]];
+                    labelPeriod = state.months[state.activeMonthKey]?.name || '';
+                } else if (currentAnalyticsPeriod === '3m') {
+                    const start = Math.max(0, activeIdx - 2);
+                    selectedMonths = allKeys.slice(start, activeIdx + 1).map(k => state.months[k]);
+                    labelPeriod = `${selectedMonths[0]?.name} — ${selectedMonths[selectedMonths.length - 1]?.name}`;
+                } else if (currentAnalyticsPeriod === '6m') {
+                    const start = Math.max(0, activeIdx - 5);
+                    selectedMonths = allKeys.slice(start, activeIdx + 1).map(k => state.months[k]);
+                    labelPeriod = `${selectedMonths[0]?.name} — ${selectedMonths[selectedMonths.length - 1]?.name}`;
+                } else if (currentAnalyticsPeriod === 'year') {
+                    const curYear = state.months[state.activeMonthKey]?.year || 2026;
+                    selectedMonths = allKeys.filter(k => state.months[k].year === curYear).map(k => state.months[k]);
+                    labelPeriod = `Рік ${curYear}`;
+                } else {
+                    selectedMonths = allKeys.map(k => state.months[k]);
+                    labelPeriod = `Уся історія (${selectedMonths.length} міс.)`;
+                }
+
+                selectedMonths.filter(Boolean).forEach(m => {
+                    const itemsSum = (m.incomes || []).reduce((s, i) => s + (i.amountUAH || 0), 0);
+                    const monthTotalInc = (m.incomeUAH || 0) + (m.savingsUAH || 0) + (m.extraIncomeUAH || 0) + itemsSum;
+                    totalIncome += monthTotalInc;
+                    const incUsd = m.incomeUSDT !== undefined ? m.incomeUSDT : (m.incomeUSD !== undefined ? m.incomeUSD : (m.rate ? m.incomeUAH / m.rate : 0));
+                    totalIncomeUSD += incUsd;
+                    (m.expenses || []).forEach(e => {
+                        filteredExpenses.push({ ...e, monthKey: `${m.year}-${m.month}`, monthRate: m.rate });
+                    });
+                });
+            }
+
+            badgeEl.textContent = labelPeriod;
+
+            // Фільтрація за режимом (Усі / Лише сплачені)
+            const chartMode = document.getElementById('an-chart-mode')?.value || 'planned';
+            const chartExpenses = chartMode === 'paid' ? filteredExpenses.filter(e => e.isPaid) : filteredExpenses;
+
+            // Підрахунок сум
+            const totalSpentUAH = filteredExpenses.filter(e => e.isPaid).reduce((s, e) => s + e.amountUAH, 0);
+            const totalSpentUSD = filteredExpenses.filter(e => e.isPaid).reduce((s, e) => s + (e.amountUSD > 0 ? e.amountUSD : (e.monthRate ? e.amountUAH / e.monthRate : 0)), 0);
+
+            const totalObligationUAH = filteredExpenses.reduce((s, e) => s + e.amountUAH, 0);
+            const totalFreeUAH = totalIncome - totalObligationUAH;
+            const avgRate = curMonth.rate || 45.0256;
+            const totalFreeUSD = avgRate ? (totalFreeUAH / avgRate) : 0;
+
+            document.getElementById('an-total-income').textContent = `${formatCurrency(totalIncome)} ₴`;
+            document.getElementById('an-total-income-usd').textContent = `$${totalIncomeUSD.toLocaleString('uk-UA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            document.getElementById('an-total-spent').textContent = `${formatCurrency(totalSpentUAH)} ₴`;
+            document.getElementById('an-total-spent-usd').textContent = `$${totalSpentUSD.toLocaleString('uk-UA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            document.getElementById('an-total-free').textContent = `${formatCurrency(totalFreeUAH)} ₴`;
+            document.getElementById('an-total-free-usd').textContent = `$${totalFreeUSD.toLocaleString('uk-UA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+            // 1. КРУГОВА ДІАГРАМА
+            const catMap = {};
+            chartExpenses.forEach(e => {
+                catMap[e.category] = (catMap[e.category] || 0) + e.amountUAH;
+            });
+
+            const activeCategories = CATEGORIES.filter(c => catMap[c.id] > 0).sort((a, b) => catMap[b.id] - catMap[a.id]);
+
+            const chartLabels = activeCategories.map(c => `${c.icon} ${c.name}`);
+            const chartData = activeCategories.map(c => catMap[c.id]);
+            const chartColors = activeCategories.map(c => c.color);
+
+            const ctxPie = document.getElementById('categoryChart')?.getContext('2d');
+            if (ctxPie) {
+                if (categoryChartInstance) categoryChartInstance.destroy();
+
+                categoryChartInstance = new Chart(ctxPie, {
+                    type: 'doughnut',
+                    data: {
+                        labels: chartLabels,
+                        datasets: [{
+                            data: chartData,
+                            backgroundColor: chartColors,
+                            borderColor: document.documentElement.classList.contains('light') ? '#ffffff' : '#131d31',
+                            borderWidth: 2,
+                            hoverOffset: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        const val = context.raw || 0;
+                                        const sum = chartData.reduce((a, b) => a + b, 0);
+                                        const pct = sum > 0 ? ((val / sum) * 100).toFixed(1) : 0;
+                                        return ` ${formatCurrency(val)} ₴ (${pct}%)`;
+                                    }
+                                }
+                            }
+                        },
+                        cutout: '68%'
+                    }
+                });
+            }
+
+            // Легенда з фіксованими кольорами
+            const legendContainer = document.getElementById('chart-legend-list');
+            if (legendContainer) {
+                const totalChartSum = chartData.reduce((a, b) => a + b, 0);
+                if (activeCategories.length === 0) {
+                    legendContainer.innerHTML = '<div class="text-[10px] text-slate-400 text-center py-2">Немає витрат у цьому періоді</div>';
+                } else {
+                    legendContainer.innerHTML = activeCategories.map(c => {
+                        const val = catMap[c.id] || 0;
+                        const pct = totalChartSum > 0 ? Math.round((val / totalChartSum) * 100) : 0;
+                        const valUSD = avgRate ? (val / avgRate).toFixed(2) : '0.00';
+                        return `
+                            <div class="flex items-center justify-between text-xs py-1 px-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800/60 transition">
+                                <div class="flex items-center gap-2 min-w-0">
+                                    <span class="w-2.5 h-2.5 rounded-full flex-shrink-0" style="background-color: ${c.color}"></span>
+                                    <span class="text-xs">${c.icon}</span>
+                                    <span class="truncate text-slate-700 dark:text-slate-300">${c.name}</span>
+                                </div>
+                                <div class="text-right flex-shrink-0 font-mono">
+                                    <span class="text-[10px] text-slate-400 mr-1.5">${pct}%</span>
+                                    <span class="font-bold text-slate-900 dark:text-white">${formatCurrency(val)} ₴</span>
+                                    <span class="block text-[8px] text-slate-400">~$${valUSD}</span>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                }
+            }
+
+            // 2. ДІАГРАМА ДИНАМІКИ ПОМІСЯЧНО
+            const ctxDyn = document.getElementById('dynamicsChart')?.getContext('2d');
+            if (ctxDyn) {
+                if (dynamicsChartInstance) dynamicsChartInstance.destroy();
+
+                const isLight = document.documentElement.classList.contains('light');
+                const dynLabels = allKeys.map(k => state.months[k].name.replace(' 2026', '').replace(' 2027', ''));
+                const incomeData = allKeys.map(k => {
+                    const m = state.months[k];
+                    const itemsSum = (m.incomes || []).reduce((s, i) => s + (i.amountUAH || 0), 0);
+                    return (m.incomeUAH || 0) + (m.savingsUAH || 0) + (m.extraIncomeUAH || 0) + itemsSum;
+                });
+                const spentData = allKeys.map(k => {
+                    return (state.months[k].expenses || []).filter(e => e.isPaid).reduce((s, e) => s + e.amountUAH, 0);
+                });
+                const plannedData = allKeys.map(k => {
+                    return (state.months[k].expenses || []).reduce((s, e) => s + e.amountUAH, 0);
+                });
+
+                dynamicsChartInstance = new Chart(ctxDyn, {
+                    type: 'bar',
+                    data: {
+                        labels: dynLabels,
+                        datasets: [
+                            {
+                                label: 'Дохід (₴)',
+                                data: incomeData,
+                                backgroundColor: '#10b981',
+                                borderRadius: 4,
+                                maxBarThickness: 16
+                            },
+                            {
+                                label: 'Факт витрат (₴)',
+                                data: spentData,
+                                backgroundColor: '#0ea5e9',
+                                borderRadius: 4,
+                                maxBarThickness: 16
+                            },
+                            {
+                                label: 'План витрат (₴)',
+                                data: plannedData,
+                                backgroundColor: isLight ? '#cbd5e1' : '#334155',
+                                borderRadius: 4,
+                                maxBarThickness: 16
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                labels: {
+                                    boxWidth: 8,
+                                    font: { size: 9 },
+                                    color: isLight ? '#475569' : '#94a3b8'
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                grid: { display: false },
+                                ticks: { font: { size: 9 }, color: isLight ? '#475569' : '#94a3b8' }
+                            },
+                            y: {
+                                grid: { color: isLight ? '#f1f5f9' : '#1e293b' },
+                                ticks: {
+                                    font: { size: 8 },
+                                    color: isLight ? '#475569' : '#94a3b8',
+                                    callback: (val) => `${val / 1000}k ₴`
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+        }
+
+        /**
+         * МОДАЛКИ: ЗП ТА ДОХОДИ
+         */
+        function openSalarySettingsModal() {
+            const curMonth = state.months[state.activeMonthKey];
+            if (!curMonth) return;
+
+            document.getElementById('salary-modal-month-name').textContent = `(${curMonth.name})`;
+            document.getElementById('settings-salary-day').value = curMonth.salaryDay || 8;
+            document.getElementById('settings-income-usdt').value = curMonth.incomeUSDT || curMonth.incomeUSD || 1600;
+            document.getElementById('settings-rate').value = curMonth.rate || 45.0256;
+            document.getElementById('settings-income-uah').value = curMonth.incomeUAH || 72040.96;
+            document.getElementById('settings-savings-uah').value = curMonth.savingsUAH || '';
+            document.getElementById('settings-extra-income-uah').value = curMonth.extraIncomeUAH || '';
+
+            updateEffectiveRateBadge();
+            document.getElementById('salary-modal').classList.remove('hidden');
+        }
+
+        function closeSalarySettingsModal() {
+            document.getElementById('salary-modal').classList.add('hidden');
+        }
+
+        function convertSalaryFromUSDT() {
+            const usdt = parseFloat(document.getElementById('settings-income-usdt').value) || 0;
+            const rate = parseFloat(document.getElementById('settings-rate').value) || 0;
+            if (usdt && rate) {
+                document.getElementById('settings-income-uah').value = (usdt * rate).toFixed(2);
+            }
+            updateEffectiveRateBadge();
+        }
+
+        function recalcUAHFromRate() {
+            convertSalaryFromUSDT();
+            showToast('Перераховано: USDT × Курс', '🔄');
+        }
+
+        function onManualUahChange() {
+            updateEffectiveRateBadge();
+        }
+
+        function updateEffectiveRateBadge() {
+            const usdt = parseFloat(document.getElementById('settings-income-usdt').value) || 0;
+            const uah = parseFloat(document.getElementById('settings-income-uah').value) || 0;
+            const badge = document.getElementById('effective-rate-badge');
+            if (usdt > 0 && uah > 0) {
+                badge.textContent = `~${(uah / usdt).toFixed(2)} ₴/USDT`;
+            } else {
+                badge.textContent = '—';
+            }
+        }
+
+        function toggleMultiPartCalc() {
+            const body = document.getElementById('multi-calc-body');
+            const arrow = document.getElementById('multi-calc-arrow');
+            body.classList.toggle('hidden');
+            arrow.classList.toggle('rotate-180');
+        }
+
+        function addMultiCalcRow() {
+            const container = document.getElementById('multi-calc-rows');
+            const count = container.children.length + 1;
+            const input = document.createElement('input');
+            input.type = 'number';
+            input.step = '0.01';
+            input.placeholder = `Вивід ${count} (грн)`;
+            input.className = 'multi-part-input w-full px-2.5 py-1.5 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg text-xs font-mono text-slate-800 dark:text-slate-200';
+            container.appendChild(input);
+        }
+
+        function applyMultiCalcSum() {
+            const inputs = document.querySelectorAll('.multi-part-input');
+            let sum = 0;
+            inputs.forEach(inp => {
+                sum += (parseFloat(inp.value) || 0);
+            });
+
+            if (sum > 0) {
+                document.getElementById('settings-income-uah').value = sum.toFixed(2);
+                updateEffectiveRateBadge();
+                showToast(`Застосовано виводів на ${formatCurrency(sum)} ₴`, '💰');
+            } else {
+                showToast('Введіть суми виводів у поля', '⚠️');
+            }
+        }
+
+        function autoFillSavingsFromPrevMonth() {
+            const prevKey = getPrevMonthKey(state.activeMonthKey);
+            const prevMonth = state.months[prevKey];
+            if (!prevMonth) {
+                showToast('Попереднього місяця ще не існує в системі', 'ℹ️');
+                return;
+            }
+
+            let prevPlanned = (prevMonth.expenses || []).reduce((s, e) => s + e.amountUAH, 0);
+            let prevBridge = 0;
+            const curMonth = state.months[state.activeMonthKey];
+            if (curMonth && Array.isArray(curMonth.expenses)) {
+                prevBridge = curMonth.expenses.filter(e => e.payDay < curMonth.salaryDay).reduce((s, e) => s + e.amountUAH, 0);
+            }
+
+            const prevExtra = (prevMonth.savingsUAH || 0) + (prevMonth.extraIncomeUAH || 0) + (prevMonth.incomes || []).reduce((s, i) => s + i.amountUAH, 0);
+            const prevTotalIncome = (prevMonth.incomeUAH || 0) + prevExtra;
+            const freeBalance = Math.max(0, prevTotalIncome - (prevPlanned + prevBridge));
+
+            document.getElementById('settings-savings-uah').value = freeBalance.toFixed(2);
+            showToast(`Підтягнуто залишок з ${prevMonth.name}: ${formatCurrency(freeBalance)} ₴`, '🏦');
+        }
+
+        function saveSalarySettings(e) {
+            e.preventDefault();
+            const curMonth = state.months[state.activeMonthKey];
+            if (!curMonth) return;
+
+            curMonth.salaryDay = parseInt(document.getElementById('settings-salary-day').value) || 8;
+            curMonth.incomeUSDT = parseFloat(document.getElementById('settings-income-usdt').value) || 0;
+            curMonth.incomeUSD = curMonth.incomeUSDT;
+            curMonth.rate = parseFloat(document.getElementById('settings-rate').value) || 45.0;
+            curMonth.incomeUAH = parseFloat(document.getElementById('settings-income-uah').value) || 0;
+            curMonth.savingsUAH = parseFloat(document.getElementById('settings-savings-uah').value) || 0;
+            curMonth.extraIncomeUAH = parseFloat(document.getElementById('settings-extra-income-uah').value) || 0;
+
+            saveState();
+            closeSalarySettingsModal();
+            renderAll();
+            showToast('Зарплату та доходи збережено', '✅');
+        }
+
+        /**
+         * МОДАЛКА: СТАТТЯ НАДХОДЖЕННЯ
+         */
+        function openIncomeItemModal(editId = null, prefillCategory = null) {
+            const curMonth = state.months[state.activeMonthKey];
+            const modal = document.getElementById('income-item-modal');
+            const titleEl = document.getElementById('income-item-modal-title');
+            const deleteBtn = document.getElementById('modal-income-delete-btn');
+            const autofillBtn = document.getElementById('income-modal-autofill-btn');
+            const debtorGroup = document.getElementById('income-modal-debtor-group');
+            const debtorInput = document.getElementById('modal-income-debtor');
+            const titleInput = document.getElementById('modal-income-title');
+            const titleLabel = document.getElementById('modal-income-title-label');
+
+            document.getElementById('income-item-form').reset();
+            document.getElementById('modal-income-id').value = '';
+            debtorInput.value = '';
+
+            if (editId) {
+                const item = (curMonth.incomes || []).find(i => i.id === editId);
+                if (item) {
+                    titleEl.textContent = item.isPreset ? `Редагувати: ${item.title}` : 'Редагувати надходження';
+                    document.getElementById('modal-income-id').value = item.id;
+                    document.getElementById('modal-income-title').value = item.title;
+                    document.getElementById('modal-income-category').value = item.category;
+                    debtorInput.value = item.debtor || '';
+                    document.getElementById('modal-income-uah').value = item.amountUAH || '';
+                    document.getElementById('modal-income-day').value = item.day || 1;
+                    document.getElementById('modal-income-isreceived').checked = item.isReceived !== false;
+                    
+                    deleteBtn.textContent = item.isPreset ? 'Скинути на 0' : 'Видалити';
+                    deleteBtn.classList.remove('hidden');
+
+                    if (item.category === 'savings') {
+                        autofillBtn.classList.remove('hidden');
+                    } else {
+                        autofillBtn.classList.add('hidden');
+                    }
+
+                    if (item.category === 'debt_return') {
+                        debtorGroup.classList.remove('hidden');
+                        titleLabel.textContent = 'Призначення / За що борг';
+                    } else {
+                        debtorGroup.classList.add('hidden');
+                        titleLabel.textContent = 'Призначення / Опис надходження';
+                    }
+                }
+            } else {
+                titleEl.textContent = 'Додати нове надходження';
+                deleteBtn.classList.add('hidden');
+                document.getElementById('modal-income-day').value = new Date().getDate();
+                document.getElementById('modal-income-isreceived').checked = true;
+
+                if (prefillCategory) {
+                    document.getElementById('modal-income-category').value = prefillCategory;
+                    if (prefillCategory === 'debt_return') {
+                        debtorGroup.classList.remove('hidden');
+                        titleLabel.textContent = 'Призначення / За що борг';
+                        titleInput.value = 'Повернення боргу';
+                    } else if (prefillCategory === 'extra') {
+                        debtorGroup.classList.add('hidden');
+                        titleLabel.textContent = 'Проєкт / Виконана робота';
+                        titleInput.value = 'Фріланс проєкт';
+                    } else if (prefillCategory === 'charity_in') {
+                        debtorGroup.classList.add('hidden');
+                        titleLabel.textContent = 'Цільовий збір / Донат';
+                        titleInput.value = 'Благодійний внесок';
+                    } else if (prefillCategory === 'savings') {
+                        debtorGroup.classList.add('hidden');
+                        titleLabel.textContent = 'Джерело заощаджень';
+                        titleInput.value = 'Заощадження з попереднього місяця';
+                        autofillBtn.classList.remove('hidden');
+                    }
+                } else {
+                    debtorGroup.classList.add('hidden');
+                    titleLabel.textContent = 'Призначення / Опис надходження';
+                }
+            }
+
+            modal.classList.remove('hidden');
+        }
+
+        function onIncomeModalCategoryChange() {
+            const cat = document.getElementById('modal-income-category').value;
+            const autofillBtn = document.getElementById('income-modal-autofill-btn');
+            const debtorGroup = document.getElementById('income-modal-debtor-group');
+            const titleLabel = document.getElementById('modal-income-title-label');
+
+            if (cat === 'savings') {
+                autofillBtn.classList.remove('hidden');
+            } else {
+                autofillBtn.classList.add('hidden');
+            }
+
+            if (cat === 'debt_return') {
+                debtorGroup.classList.remove('hidden');
+                titleLabel.textContent = 'Призначення / За що борг';
+            } else {
+                debtorGroup.classList.add('hidden');
+                titleLabel.textContent = 'Призначення / Опис надходження';
+            }
+        }
+
+        function autofillSavingsDirectly() {
+            const prevKey = getPrevMonthKey(state.activeMonthKey);
+            const prevMonth = state.months[prevKey];
+            if (!prevMonth) {
+                showToast('Попереднього місяця ще немає в базі', 'ℹ️');
+                return;
+            }
+
+            let prevPlanned = (prevMonth.expenses || []).reduce((s, e) => s + e.amountUAH, 0);
+            let prevBridge = 0;
+            const curMonth = state.months[state.activeMonthKey];
+            if (curMonth && Array.isArray(curMonth.expenses)) {
+                prevBridge = curMonth.expenses.filter(e => e.payDay < curMonth.salaryDay).reduce((s, e) => s + e.amountUAH, 0);
+            }
+
+            const prevExtra = (prevMonth.incomes || []).reduce((s, i) => s + (i.amountUAH || 0), 0);
+            const prevTotalIncome = (prevMonth.incomeUAH || 0) + prevExtra;
+            const freeBalance = Math.max(0, prevTotalIncome - (prevPlanned + prevBridge));
+
+            const curSavings = curMonth.incomes.find(i => i.category === 'savings');
+            if (curSavings) {
+                curSavings.amountUAH = freeBalance;
+                curSavings.isReceived = freeBalance > 0;
+            } else {
+                curMonth.incomes.push({
+                    id: 'inc_' + Date.now().toString(36),
+                    title: `Заощаджено з ${prevMonth.name}`,
+                    category: 'savings',
+                    amountUAH: freeBalance,
+                    day: 1,
+                    isReceived: freeBalance > 0,
+                    isPreset: false
+                });
+            }
+
+            saveState();
+            renderAll();
+            showToast(`Підставлено залишок з ${prevMonth.name}: +${formatCurrency(freeBalance)} ₴`, '🏦');
+        }
+
+        function autofillSavingsIntoModal() {
+            const prevKey = getPrevMonthKey(state.activeMonthKey);
+            const prevMonth = state.months[prevKey];
+            if (!prevMonth) {
+                showToast('Попереднього місяця ще немає в базі', 'ℹ️');
+                return;
+            }
+
+            let prevPlanned = (prevMonth.expenses || []).reduce((s, e) => s + e.amountUAH, 0);
+            let prevBridge = 0;
+            const curMonth = state.months[state.activeMonthKey];
+            if (curMonth && Array.isArray(curMonth.expenses)) {
+                prevBridge = curMonth.expenses.filter(e => e.payDay < curMonth.salaryDay).reduce((s, e) => s + e.amountUAH, 0);
+            }
+
+            const prevExtra = (prevMonth.incomes || []).reduce((s, i) => s + (i.amountUAH || 0), 0);
+            const prevTotalIncome = (prevMonth.incomeUAH || 0) + prevExtra;
+            const freeBalance = Math.max(0, prevTotalIncome - (prevPlanned + prevBridge));
+
+            document.getElementById('modal-income-uah').value = freeBalance.toFixed(2);
+            showToast(`Підставлено залишок з ${prevMonth.name}: ${formatCurrency(freeBalance)} ₴`, '🏦');
+        }
+
+        function closeIncomeItemModal() {
+            document.getElementById('income-item-modal').classList.add('hidden');
+        }
+
+        function saveIncomeItem(e) {
+            e.preventDefault();
+            const curMonth = state.months[state.activeMonthKey];
+            if (!curMonth) return;
+
+            curMonth.incomes = curMonth.incomes || [];
+            const editId = document.getElementById('modal-income-id').value;
+            const title = document.getElementById('modal-income-title').value.trim();
+            const category = document.getElementById('modal-income-category').value;
+            const debtor = document.getElementById('modal-income-debtor').value.trim();
+            const amountUAH = parseFloat(document.getElementById('modal-income-uah').value) || 0;
+            const day = parseInt(document.getElementById('modal-income-day').value) || 1;
+            const isReceived = document.getElementById('modal-income-isreceived').checked;
+
+            if (editId) {
+                const item = curMonth.incomes.find(i => i.id === editId);
+                if (item) {
+                    item.title = title;
+                    item.category = category;
+                    item.debtor = debtor;
+                    item.amountUAH = amountUAH;
+                    item.day = day;
+                    item.isReceived = isReceived;
+                }
+            } else {
+                curMonth.incomes.push({
+                    id: 'inc_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 4),
+                    title,
+                    category,
+                    debtor,
+                    amountUAH,
+                    day,
+                    isReceived,
+                    isPreset: false
+                });
+            }
+
+            // Синхронізація з полями savingsUAH та extraIncomeUAH
+            if (category === 'savings') {
+                curMonth.savingsUAH = curMonth.incomes.filter(i => i.category === 'savings').reduce((s, i) => s + (i.amountUAH || 0), 0);
+            } else if (category === 'extra') {
+                curMonth.extraIncomeUAH = curMonth.incomes.filter(i => i.category === 'extra').reduce((s, i) => s + (i.amountUAH || 0), 0);
+            }
+
+            saveState();
+            closeIncomeItemModal();
+            renderAll();
+            showToast('Надходження збережено', '💰');
+        }
+
+        function deleteCurrentIncomeItem() {
+            const editId = document.getElementById('modal-income-id').value;
+            const curMonth = state.months[state.activeMonthKey];
+            if (!editId || !curMonth || !curMonth.incomes) return;
+
+            const item = curMonth.incomes.find(i => i.id === editId);
+            if (item && item.isPreset) {
+                // Для предустановлених статей не видаляємо сам пункт, а скидаємо суму в 0
+                item.amountUAH = 0;
+                item.debtor = '';
+                item.isReceived = false;
+                if (item.category === 'savings') curMonth.savingsUAH = 0;
+                if (item.category === 'extra') curMonth.extraIncomeUAH = 0;
+                showToast('Суму статті скинуто до 0 ₴', '🔄');
+            } else {
+                curMonth.incomes = curMonth.incomes.filter(i => i.id !== editId);
+                showToast('Надходження видалено', '🗑️');
+            }
+
+            saveState();
+            closeIncomeItemModal();
+            renderAll();
+        }
+
+        function makeIncomeAmountEditable(e, id) {
+            e.stopPropagation();
+            const curMonth = state.months[state.activeMonthKey];
+            const item = curMonth.incomes.find(x => x.id === id);
+            if (!item) return;
+
+            const el = e.currentTarget;
+            const input = document.createElement('input');
+            input.type = 'number';
+            input.step = '0.01';
+            input.value = item.amountUAH || '';
+            input.placeholder = '0.00';
+            input.className = 'w-24 px-1 py-0.5 text-xs bg-slate-900 text-white border border-emerald-500 rounded outline-none font-mono text-right';
+
+            const finish = () => {
+                const val = parseFloat(input.value) || 0;
+                item.amountUAH = val;
+                item.isReceived = val > 0;
+                saveState();
+                renderAll();
+                showToast(`Суму оновлено: +${formatCurrency(val)} ₴`, '💰');
+            };
+
+            input.onblur = finish;
+            input.onkeydown = (ev) => {
+                if (ev.key === 'Enter') finish();
+                if (ev.key === 'Escape') renderAll();
+            };
+
+            el.innerHTML = '';
+            el.appendChild(input);
+            input.focus();
+            input.select();
+        }
+
+        function makeIncomeDayEditable(e, id) {
+            e.stopPropagation();
+            const curMonth = state.months[state.activeMonthKey];
+            const item = curMonth.incomes.find(x => x.id === id);
+            if (!item) return;
+
+            const el = e.currentTarget;
+            const input = document.createElement('input');
+            input.type = 'number';
+            input.min = '1';
+            input.max = '31';
+            input.value = item.day || 1;
+            input.className = 'w-8 px-0.5 py-0 text-[10px] bg-slate-900 text-white border border-emerald-500 rounded outline-none font-mono text-center';
+
+            const finish = () => {
+                const val = parseInt(input.value);
+                if (val >= 1 && val <= 31) {
+                    item.day = val;
+                    saveState();
+                    renderAll();
+                    showToast('Число змінено на ' + val, '📅');
+                } else {
+                    renderAll();
+                }
+            };
+
+            input.onblur = finish;
+            input.onkeydown = (ev) => {
+                if (ev.key === 'Enter') finish();
+                if (ev.key === 'Escape') renderAll();
+            };
+
+            el.innerHTML = '';
+            el.appendChild(input);
+            input.focus();
+            input.select();
+        }
+
+        function toggleIncomeReceived(id) {
+            const curMonth = state.months[state.activeMonthKey];
+            if (!curMonth || !curMonth.incomes) return;
+
+            const item = curMonth.incomes.find(i => i.id === id);
+            if (item) {
+                item.isReceived = !item.isReceived;
+                saveState();
+                renderAll();
+                showToast(item.isReceived ? `Отримано: ${item.title}` : `Очікується: ${item.title}`, item.isReceived ? '✅' : '⏳');
+            }
+        }
+
+        /**
+         * МОДАЛЬНЕ ВІКНО: СТВОРЕННЯ / РЕДАГУВАННЯ ВИТРАТИ
+         */
+        function openExpenseModal(editId = null) {
+            const curMonth = state.months[state.activeMonthKey];
+            const form = document.getElementById('expense-form');
+            form.reset();
+            document.getElementById('modal-id').value = '';
+
+            const delBtn = document.getElementById('modal-delete-btn');
+            const dupBtn = document.getElementById('modal-duplicate-btn');
+            const titleEl = document.getElementById('modal-expense-title');
+
+            if (editId) {
+                const item = curMonth.expenses.find(e => e.id === editId);
+                if (item) {
+                    titleEl.textContent = 'Редагувати витрату';
+                    document.getElementById('modal-id').value = item.id;
+                    document.getElementById('modal-title').value = item.title;
+                    document.getElementById('modal-category').value = item.category;
+
+                    const catObj = CATEGORIES.find(c => c.id === item.category);
+                    document.getElementById('modal-section').value = catObj ? catObj.section : 'regular';
+
+                    document.getElementById('modal-uah').value = item.amountUAH;
+                    document.getElementById('modal-usd').value = item.amountUSD || '';
+                    document.getElementById('modal-day').value = item.payDay;
+                    document.getElementById('modal-ispaid').checked = item.isPaid;
+
+                    delBtn.classList.remove('hidden');
+                    dupBtn.classList.remove('hidden');
+                }
+            } else {
+                titleEl.textContent = 'Додати витрату';
+                document.getElementById('modal-day').value = new Date().getDate();
+                delBtn.classList.add('hidden');
+                dupBtn.classList.add('hidden');
+            }
+
+            document.getElementById('expense-modal').classList.remove('hidden');
+        }
+
+        function closeExpenseModal() {
+            document.getElementById('expense-modal').classList.add('hidden');
+        }
+
+        function toggleCurrencyMode(curr) {
+            const curMonth = state.months[state.activeMonthKey];
+            const rate = curMonth.rate || 45.0256;
+            if (curr === 'usd') {
+                const uah = parseFloat(document.getElementById('modal-uah').value) || 0;
+                if (uah > 0) {
+                    document.getElementById('modal-usd').value = (uah / rate).toFixed(2);
+                }
+            }
+        }
+
+        function onUahInput() {
+            const curMonth = state.months[state.activeMonthKey];
+            const rate = curMonth.rate || 45.0256;
+            const uah = parseFloat(document.getElementById('modal-uah').value) || 0;
+            const isUsdMode = document.querySelector('input[name="currency_type"]:checked')?.value === 'usd';
+            if (isUsdMode && uah > 0) {
+                document.getElementById('modal-usd').value = (uah / rate).toFixed(2);
+            }
+        }
+
+        function onUsdInput() {
+            const curMonth = state.months[state.activeMonthKey];
+            const rate = curMonth.rate || 45.0256;
+            const usd = parseFloat(document.getElementById('modal-usd').value) || 0;
+            if (usd > 0) {
+                document.getElementById('modal-uah').value = (usd * rate).toFixed(2);
+            }
+        }
+
+        function saveExpense(e) {
+            e.preventDefault();
+            const curMonth = state.months[state.activeMonthKey];
+            if (!curMonth) return;
+
+            const editId = document.getElementById('modal-id').value;
+            const title = document.getElementById('modal-title').value.trim();
+            const category = document.getElementById('modal-category').value;
+            const amountUAH = parseFloat(document.getElementById('modal-uah').value) || 0;
+            const amountUSD = parseFloat(document.getElementById('modal-usd').value) || 0;
+            const payDay = parseInt(document.getElementById('modal-day').value) || 1;
+            const isPaid = document.getElementById('modal-ispaid').checked;
+
+            if (editId) {
+                const item = curMonth.expenses.find(x => x.id === editId);
+                if (item) {
+                    item.title = title;
+                    item.category = category;
+                    item.amountUAH = amountUAH;
+                    item.amountUSD = amountUSD;
+                    item.payDay = payDay;
+                    item.isPaid = isPaid;
+                }
+            } else {
+                curMonth.expenses.push({
+                    id: 'exp_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 4),
+                    title,
+                    category,
+                    amountUAH,
+                    amountUSD,
+                    payDay,
+                    isPaid
+                });
+            }
+
+            saveState();
+            closeExpenseModal();
+            renderAll();
+            showToast('Витрату збережено', '✅');
+        }
+
+        function deleteCurrentExpense() {
+            const editId = document.getElementById('modal-id').value;
+            const curMonth = state.months[state.activeMonthKey];
+            if (!editId || !curMonth) return;
+
+            curMonth.expenses = curMonth.expenses.filter(x => x.id !== editId);
+            saveState();
+            closeExpenseModal();
+            renderAll();
+            showToast('Витрату видалено', '🗑️');
+        }
+
+        function duplicateCurrentExpense() {
+            const editId = document.getElementById('modal-id').value;
+            closeExpenseModal();
+            if (editId) duplicateExpense(editId);
+        }
+
+        /**
+         * МОДАЛКА: КАЛЬКУЛЯТОР ЗВІРКИ ТА ДЕТЕКТОР ЗАБУТИХ ВИТРАТ
+         */
+        function openReconciliationModal() {
+            const curMonth = state.months[state.activeMonthKey];
+            if (!curMonth) return;
+
+            let totalPendingUAH = 0;
+            curMonth.expenses.forEach(e => {
+                if (!e.isPaid) totalPendingUAH += e.amountUAH;
+            });
+
+            const nextKey = getNextMonthKey(state.activeMonthKey);
+            const nextMonth = state.months[nextKey];
+            let bridgeTotalUAH = 0;
+            if (nextMonth && Array.isArray(nextMonth.expenses)) {
+                nextMonth.expenses.filter(e => e.payDay < nextMonth.salaryDay).forEach(b => {
+                    bridgeTotalUAH += b.amountUAH;
+                });
+            }
+
+            const toPay = totalPendingUAH + bridgeTotalUAH;
+            document.getElementById('recon-to-pay-display').textContent = `${formatCurrency(toPay)} ₴`;
+            document.getElementById('recon-actual-input').value = '';
+            document.getElementById('recon-safe-balance-display').textContent = '0.00 ₴';
+            document.getElementById('recon-discrepancy-card').classList.add('hidden');
+
+            document.getElementById('reconciliation-modal').classList.remove('hidden');
+        }
+
+        function closeReconciliationModal() {
+            document.getElementById('reconciliation-modal').classList.add('hidden');
+        }
+
+        function calculateReconciliation() {
+            const curMonth = state.months[state.activeMonthKey];
+            const actualVal = parseFloat(document.getElementById('recon-actual-input').value) || 0;
+
+            let totalPendingUAH = 0;
+            let totalPaidUAH = 0;
+            curMonth.expenses.forEach(e => {
+                if (e.isPaid) totalPaidUAH += e.amountUAH;
+                else totalPendingUAH += e.amountUAH;
+            });
+
+            const nextKey = getNextMonthKey(state.activeMonthKey);
+            const nextMonth = state.months[nextKey];
+            let bridgeTotalUAH = 0;
+            if (nextMonth && Array.isArray(nextMonth.expenses)) {
+                nextMonth.expenses.filter(e => e.payDay < nextMonth.salaryDay).forEach(b => {
+                    bridgeTotalUAH += b.amountUAH;
+                });
+            }
+
+            const toPay = totalPendingUAH + bridgeTotalUAH;
+            const safeBalance = actualVal - toPay;
+            const safeEl = document.getElementById('recon-safe-balance-display');
+            safeEl.textContent = `${formatCurrency(safeBalance)} ₴`;
+
+            if (safeBalance < 0) {
+                safeEl.className = 'font-black text-rose-500 font-mono';
+            } else {
+                safeEl.className = 'font-black text-emerald-600 dark:text-emerald-400 font-mono';
+            }
+
+            // Детектор розбіжностей
+            const discCard = document.getElementById('recon-discrepancy-card');
+            const diffDisplay = document.getElementById('recon-diff-display');
+            const diffNote = document.getElementById('recon-diff-note');
+
+            const itemsIncome = (curMonth.incomes || []).filter(i => i.isReceived !== false).reduce((s, i) => s + (i.amountUAH || 0), 0);
+            const expectedInHand = Math.max(0, (curMonth.incomeUAH + (curMonth.savingsUAH || 0) + (curMonth.extraIncomeUAH || 0) + itemsIncome) - totalPaidUAH);
+
+            if (actualVal > 0 && Math.abs(expectedInHand - actualVal) > 5) {
+                const diff = expectedInHand - actualVal;
+                discCard.classList.remove('hidden');
+                if (diff > 0) {
+                    diffDisplay.textContent = `-${formatCurrency(diff)} ₴`;
+                    diffNote.textContent = `У вас на руках на ${formatCurrency(diff)} ₴ менше, ніж зафіксовано в таблиці. Можливо, були забуті дрібні витрати.`;
+                } else {
+                    diffDisplay.textContent = `+${formatCurrency(Math.abs(diff))} ₴`;
+                    diffNote.textContent = `У вас на руках на ${formatCurrency(Math.abs(diff))} ₴ більше, ніж очікувалося. Можливо, не відмічено додатковий дохід.`;
+                }
+            } else {
+                discCard.classList.add('hidden');
+            }
+        }
+
+        function createExpenseFromDiscrepancy() {
+            const curMonth = state.months[state.activeMonthKey];
+            const actualVal = parseFloat(document.getElementById('recon-actual-input').value) || 0;
+            let totalPaidUAH = curMonth.expenses.filter(e => e.isPaid).reduce((s, e) => s + e.amountUAH, 0);
+
+            const itemsIncome = (curMonth.incomes || []).filter(i => i.isReceived !== false).reduce((s, i) => s + (i.amountUAH || 0), 0);
+            const expectedInHand = Math.max(0, (curMonth.incomeUAH + (curMonth.savingsUAH || 0) + (curMonth.extraIncomeUAH || 0) + itemsIncome) - totalPaidUAH);
+            const diff = expectedInHand - actualVal;
+
+            if (diff > 0) {
+                curMonth.expenses.push({
+                    id: 'exp_' + Date.now().toString(36),
+                    title: 'Необліковані витрати (вирівняно)',
+                    category: 'other',
+                    amountUAH: +diff.toFixed(2),
+                    amountUSD: 0,
+                    payDay: new Date().getDate(),
+                    isPaid: true
+                });
+                saveState();
+                closeReconciliationModal();
+                renderAll();
+                showToast(`Занесено ${formatCurrency(diff)} ₴ у витрати`, '⚖️');
+            }
+        }
+
+        /**
+         * РЕЗЕРВНЕ КОПІЮВАННЯ / BACKUP
+         */
+        function openBackupModal() {
+            document.getElementById('backup-modal').classList.remove('hidden');
+        }
+
+        function closeBackupModal() {
+            document.getElementById('backup-modal').classList.add('hidden');
+        }
+
+        function exportDataBackup() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state, null, 2));
+            const dlAnchor = document.createElement('a');
+            dlAnchor.setAttribute("href", dataStr);
+            dlAnchor.setAttribute("download", `FinPulse_Backup_${new Date().toISOString().slice(0, 10)}.json`);
+            document.body.appendChild(dlAnchor);
+            dlAnchor.click();
+            dlAnchor.remove();
+            showToast('Резервну копію збережено', '💾');
+        }
+
+        function importDataBackup(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                try {
+                    const imported = JSON.parse(event.target.result);
+                    if (imported && imported.months) {
+                        state = imported;
+                        saveState();
+                        closeBackupModal();
+                        renderAll();
+                        showToast('Дані успішно відновлено', '✅');
+                    } else {
+                        showToast('Невірний формат файлу', '⚠️');
+                    }
+                } catch (err) {
+                    showToast('Помилка читання JSON', '❌');
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function resetToDemoData() {
+            state = getDefaultInitialState();
+            saveState();
+            closeBackupModal();
+            renderAll();
+            showToast('Скинуто до початкових даних з PDF', '🔄');
+        }
+
+        /**
+         * УТИЛІТИ: ФОРМАТУВАННЯ ТА ТОСТИ
+         */
+        function formatCurrency(val) {
+            if (val === undefined || val === null || isNaN(val)) return '0.00';
+            return Number(val).toLocaleString('uk-UA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        let toastTimeout = null;
+        function showToast(msg, icon = '✅') {
+            const toast = document.getElementById('toast');
+            document.getElementById('toast-msg').textContent = msg;
+            document.getElementById('toast-icon').textContent = icon;
+
+            toast.classList.remove('opacity-0', 'pointer-events-none');
+            toast.classList.add('opacity-100');
+
+            if (toastTimeout) clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => {
+                toast.classList.remove('opacity-100');
+                toast.classList.add('opacity-0', 'pointer-events-none');
+            }, 2500);
+        }
+    </script>
+</body>
+</html>
