@@ -293,28 +293,6 @@
                 </div>
             </section>
 
-            <!-- КОМПАКТНИЙ БАНЕР ДОХОДІВ З ПЕРЕХОДОМ У ВКЛАДКУ ДОХОДІВ -->
-            <section onclick="switchMainTab('incomes')" class="rounded-2xl p-3 bg-emerald-500/10 hover:bg-emerald-500/15 border border-emerald-500/20 text-slate-200 cursor-pointer transition flex items-center justify-between gap-2 shadow-sm group">
-                <div class="flex items-center gap-2.5 min-w-0">
-                    <div class="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-sm font-bold flex-shrink-0 group-hover:scale-105 transition-transform">
-                        💰
-                    </div>
-                    <div class="min-w-0">
-                        <div class="flex items-center gap-1.5 flex-wrap">
-                            <span class="text-xs font-bold text-slate-900 dark:text-white">Доходи та надходження циклу</span>
-                            <span class="px-1.5 py-0.2 rounded-md bg-emerald-500/20 text-[9px] font-mono text-emerald-600 dark:text-emerald-400 font-bold" id="incomes-brief-badge">ЗП + джерела</span>
-                        </div>
-                        <div class="text-[10px] text-slate-500 dark:text-slate-400">
-                            Всього: <span class="font-bold text-emerald-600 dark:text-emerald-400 font-mono" id="incomes-brief-total">0.00 ₴</span> • Натисніть для перегляду та додавання
-                        </div>
-                    </div>
-                </div>
-                <div class="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 text-xs font-bold flex-shrink-0 group-hover:translate-x-0.5 transition-transform">
-                    <span>Керувати</span>
-                    <span>➔</span>
-                </div>
-            </section>
-
             <!-- БЛОК-СПОВІЩЕННЯ: ПРОСТРОЧЕНІ ЧЕКБОКСИ -->
             <section id="overdue-alert-banner" class="rounded-2xl p-3 bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/30 text-slate-800 dark:text-amber-200 hidden transition-all">
                 <div class="flex items-center justify-between gap-2.5">
@@ -334,28 +312,6 @@
                         <span>Показати</span>
                         <span>➔</span>
                     </button>
-                </div>
-            </section>
-
-            <!-- ЗАРПЛАТНИЙ МІСТОК ДО ЗП НАСТУПНОГО МІСЯЦЯ -->
-            <section id="bridge-card" class="rounded-2xl p-3 bg-amber-500/10 border border-amber-500/20 text-amber-400 transition-all">
-                <div class="flex items-center justify-between cursor-pointer" onclick="toggleBridgeDetails()">
-                    <div class="flex items-center gap-2">
-                        <span class="text-base">🌉</span>
-                        <div>
-                            <div class="text-xs font-bold flex items-center gap-1.5">
-                                <span>Витрати до ЗП наступного місяця</span>
-                                <span class="px-1.5 py-0.2 rounded-md bg-amber-500/20 text-[9px] font-mono" id="bridge-days-range">1-7 число</span>
-                            </div>
-                            <div class="text-[10px] text-slate-500 dark:text-slate-400">
-                                Зарезервовано з поточної ЗП: <span class="font-bold text-amber-600 dark:text-amber-400" id="bridge-total-display">0.00 ₴</span>
-                            </div>
-                        </div>
-                    </div>
-                    <span id="bridge-toggle-arrow" class="text-xs transition-transform">▼</span>
-                </div>
-                <div id="bridge-items-list" class="mt-2 pt-2 border-t border-amber-500/20 space-y-1.5 hidden">
-                    <!-- Заповнюється скриптом -->
                 </div>
             </section>
 
@@ -428,6 +384,39 @@
             <!-- СПИСОК ВИТРАТ ПО СЕКЦІЯХ -->
             <div id="expenses-container" class="space-y-4 pt-1">
                 <!-- Заповнюється скриптом renderExpenses() -->
+            </div>
+
+            <!-- ЗАРПЛАТНИЙ МІСТОК ДО ЗП НАСТУПНОГО МІСЯЦЯ (В САМОМУ НИЗУ, РОЗГОРНУТО ТА ВИДІЛЕНО) -->
+            <div class="pt-2 border-t-2 border-dashed border-amber-500/30 mt-6">
+                <section id="bridge-card" class="rounded-2xl p-3.5 bg-amber-500/10 border-2 border-amber-500/30 text-amber-500 dark:text-amber-400 shadow-sm space-y-2.5 transition-all">
+                    <div class="flex items-center justify-between cursor-pointer" onclick="toggleBridgeDetails()">
+                        <div class="flex items-center gap-2.5">
+                            <span class="text-xl flex-shrink-0">🌉</span>
+                            <div>
+                                <div class="text-xs font-bold flex items-center gap-1.5 flex-wrap text-slate-900 dark:text-amber-300">
+                                    <span>Витрати до ЗП наступного місяця</span>
+                                    <span class="px-1.5 py-0.5 rounded-md bg-amber-500/20 text-amber-700 dark:text-amber-300 text-[10px] font-mono font-bold" id="bridge-days-range">1-7 число</span>
+                                </div>
+                                <div class="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
+                                    Платежі до дня нової ЗП наступного періоду
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2 flex-shrink-0">
+                            <div class="text-right">
+                                <span class="text-[9px] uppercase font-bold text-slate-500 dark:text-slate-400 block">Зарезервовано:</span>
+                                <span class="font-black text-xs sm:text-sm text-amber-600 dark:text-amber-400 font-mono" id="bridge-total-display">0.00 ₴</span>
+                            </div>
+                            <span id="bridge-toggle-arrow" class="text-xs text-amber-500 transition-transform">▲</span>
+                        </div>
+                    </div>
+                    <p class="text-[10px] text-slate-500 dark:text-amber-200/80 leading-relaxed pt-1.5 border-t border-amber-500/20">
+                        💡 Ці витрати припадають на початок наступного місяця <strong>до нарахування нової заробітної плати</strong>. Додаток автоматично резервує під них кошти з поточного балансу.
+                    </p>
+                    <div id="bridge-items-list" class="space-y-1.5 pt-1">
+                        <!-- Заповнюється скриптом -->
+                    </div>
+                </section>
             </div>
 
         </div>
