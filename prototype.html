@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex">
+    <title>FinPulse — прототип шифрування</title>
+    <script type="module" src="/src/prototype/main.js"></script>
+</head>
+<body>
+<main class="wrap">
+    <h1>Прототип: шифрування і Google Диск</h1>
+    <p class="lead">Тестова сторінка етапу 4. Працює з <b>вигаданими даними</b>, ваш бюджет у FinPulse не зачіпає.
+        На Диск записується один файл <code>finpulse-prototype.json</code> у приховану папку застосунку.</p>
+
+    <section class="card">
+        <h2>1. Вхід Google</h2>
+        <p id="auth-status" class="muted">Ще не увійшли.</p>
+        <div class="row">
+            <button id="btn-signin" class="primary">Увійти через Google</button>
+            <button id="btn-signout">Вийти</button>
+        </div>
+    </section>
+
+    <section class="card">
+        <h2>2. Створити зашифроване сховище</h2>
+        <label for="new-password">Придумайте пароль FinPulse (тестовий)</label>
+        <input id="new-password" type="password" autocomplete="new-password" minlength="8" placeholder="Щонайменше 8 символів">
+        <button id="btn-create" class="primary">Зашифрувати й записати на Диск</button>
+        <div id="recovery-box" class="recovery" hidden>
+            <p><b>Ключ відновлення</b> (показується один раз; у справжньому застосунку його треба зберегти):</p>
+            <p id="recovery-key" class="key"></p>
+        </div>
+    </section>
+
+    <section class="card">
+        <h2>3. Відкрити з Диска</h2>
+        <p class="muted">Спробуйте на іншому пристрої або в іншому браузері після входу тим самим Google-акаунтом.</p>
+        <label for="open-secret">Пароль або ключ відновлення</label>
+        <input id="open-secret" type="password" autocomplete="current-password">
+        <div class="row">
+            <button id="btn-open-password" class="primary">Відкрити паролем</button>
+            <button id="btn-open-recovery">Відкрити ключем відновлення</button>
+        </div>
+        <pre id="opened" class="out" hidden></pre>
+    </section>
+
+    <section class="card">
+        <h2>4. Що лежить на Диску</h2>
+        <p class="muted">Так файл бачить Google: лише шифротекст, без сум і назв.</p>
+        <button id="btn-raw">Показати файл з Диска</button>
+        <pre id="raw" class="out" hidden></pre>
+        <button id="btn-delete" class="danger">Видалити тестовий файл</button>
+    </section>
+
+    <section class="card">
+        <h2>Журнал</h2>
+        <ol id="log" class="log"></ol>
+    </section>
+</main>
+</body>
+</html>
