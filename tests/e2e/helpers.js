@@ -7,6 +7,7 @@ export const STORAGE_KEY = 'finpulse_app_state_v3';
 export async function openApp(page, { seed } = {}) {
     const errors = [];
     page.on('pageerror', e => errors.push(e.message));
+    page.on('console', m => { if (m.type() === 'error' && /Content Security Policy/i.test(m.text())) errors.push(m.text()); });
     await page.clock.setFixedTime(TODAY);
     // Google Fonts are not needed for the checks and may be unreachable.
     await page.route(/fonts\.(googleapis|gstatic)\.com/, r => r.abort());
@@ -19,7 +20,7 @@ export async function openApp(page, { seed } = {}) {
         }, [STORAGE_KEY, JSON.stringify(seed)]);
     }
     await page.goto('./');
-    await expect(page.locator('#kpi-in-hand-uah')).not.toHaveText('');
+    await expect(page.locator('#kpi-in-hand')).not.toHaveText('');
     return errors;
 }
 
@@ -31,4 +32,13 @@ export async function text(page, selector) {
 
 export async function savedState(page) {
     return page.evaluate(key => JSON.parse(localStorage.getItem(key)), STORAGE_KEY);
+}
+
+/** Opens a tab with whichever navigation is visible (bottom bar on phones, header on desktop). */
+export async function openTab(page, tab) {
+    await page.locator(`[data-action="tab"][data-tab="${tab}"]:visible`).click();
+}
+
+export async function openMore(page) {
+    await page.locator('[data-action="more"]:visible').click();
 }

@@ -6,6 +6,7 @@
 const SAFE_ID = /^[A-Za-z0-9_-]{1,64}$/;
 const SAFE_CATEGORY = /^[a-z_]{1,32}$/;
 const MONTH_KEY = /^\d{4}-\d{2}$/;
+const SAFE_CURRENCY = ['UAH', 'USD', 'USDT'];
 
 const num = (v, fallback = 0) => {
     const n = typeof v === 'string' && v.trim() !== '' ? Number(v) : v;
@@ -28,6 +29,7 @@ function cleanRecord(rec, prefix, fields) {
         if (f in rec && rec[f] !== undefined) out[f] = f === 'isReceived' ? rec[f] !== false : !!rec[f];
     }
     if ('debtor' in rec) out.debtor = str(rec.debtor);
+    if ('currency' in rec) out.currency = SAFE_CURRENCY.includes(rec.currency) ? rec.currency : 'USD';
     return out;
 }
 
@@ -46,6 +48,24 @@ export function sanitizeState(raw) {
         out.expenses = (Array.isArray(m.expenses) ? m.expenses : [])
             .map(e => cleanRecord(e, 'exp', { defaultCategory: 'other', numbers: ['amountUAH', 'amountUSD', 'payDay'], booleans: ['isPaid'] }))
             .filter(Boolean);
+        if ('salaryParts' in m) {
+            out.salaryParts = (Array.isArray(m.salaryParts) ? m.salaryParts : [])
+                .filter(x => x && typeof x === 'object')
+                .map(x => ({
+                    id: SAFE_ID.test(str(x.id)) ? x.id : newId('sal'),
+                    amount: num(x.amount),
+                    currency: SAFE_CURRENCY.includes(x.currency) ? x.currency : 'UAH',
+                    uah: num(x.uah),
+                    day: num(x.day, 1),
+                    received: x.received !== false,
+                }));
+        }
+        if ('goalMoves' in m) {
+            out.goalMoves = (Array.isArray(m.goalMoves) ? m.goalMoves : [])
+                .filter(x => x && typeof x === 'object' && SAFE_ID.test(str(x.goalId)))
+                .map(x => ({ id: SAFE_ID.test(str(x.id)) ? x.id : newId('gm'), goalId: x.goalId, amount: num(x.amount), day: num(x.day, 1) }));
+        }
+        if ('secondPayDay' in m) out.secondPayDay = num(m.secondPayDay);
         if ('incomes' in m) {
             out.incomes = (Array.isArray(m.incomes) ? m.incomes : [])
                 .map(i => cleanRecord(i, 'inc', { defaultCategory: 'other_inc', numbers: ['amountUAH', 'day'], booleans: ['isReceived', 'isPreset'] }))
@@ -57,6 +77,12 @@ export function sanitizeState(raw) {
     const keys = Object.keys(months).sort();
     const activeMonthKey = months[raw.activeMonthKey] || keys.length === 0 ? raw.activeMonthKey : keys[keys.length - 1];
     const out = { ...raw, activeMonthKey, months };
+    if ('version' in raw) out.version = num(raw.version);
+    if ('goals' in raw) {
+        out.goals = (Array.isArray(raw.goals) ? raw.goals : [])
+            .filter(g => g && typeof g === 'object')
+            .map(g => ({ id: SAFE_ID.test(str(g.id)) ? g.id : newId('goal'), name: str(g.name), target: num(g.target) }));
+    }
     if ('appMode' in raw) out.appMode = raw.appMode === 'edit' ? 'edit' : 'view';
     return out;
 }
