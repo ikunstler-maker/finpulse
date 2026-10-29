@@ -5,6 +5,7 @@ import { plural, t } from '../i18n/index.js';
 import { activeMonth, state, update } from '../state.js';
 import { currencyFields, readCurrency, wireCurrency } from './currency.js';
 import { dayMonth, esc, foreign, money, monthName, number } from './format.js';
+import { itemRow } from './row.js';
 import { closeSheet, confirmSheet, openSheet, toast } from './sheet.js';
 
 /** Шаблон без суми — порожнє місце, а не надходження; у списку його не показуємо. */
@@ -14,18 +15,21 @@ const visibleIncome = i => !(i.isPreset && !(i.amountUAH > 0));
 
 function partRow(p, m) {
     const rate = partRate(p);
-    return `
-        <div class="item salary-part">
-            <button class="check" role="checkbox" aria-checked="${!!p.received}" data-action="toggle-part" data-id="${p.id}"
-                aria-label="${esc(t(p.received ? 'salary.markExpected' : 'salary.markReceived', { amount: foreign(p.amount, p.currency) }))}"><span></span></button>
-            <button class="item-main" data-action="edit-part" data-id="${p.id}">
-                <span class="item-text">
-                    <span class="item-title num">${foreign(p.amount, p.currency)}</span>
-                    <span class="item-meta"><span class="num">${dayMonth(m.month, p.day)}</span>${rate ? `<span class="num">${t('salary.rateShort', { rate: number(rate, 4) })}</span>` : ''}${p.received ? '' : `<span class="chip bridge">${t('incomes.expected')}</span>`}</span>
-                </span>
-                <span class="amount"><strong class="num">+${money(p.uah)}</strong></span>
-            </button>
-        </div>`;
+    const chips = [
+        rate ? `<span class="num">${t('salary.rateShort', { rate: number(rate, 4) })}</span>` : '',
+        p.received ? '' : `<span class="chip bridge">${t('incomes.expected')}</span>`,
+    ].join('');
+    return itemRow({
+        cls: 'salary-part',
+        checked: p.received,
+        check: { action: 'toggle-part', id: p.id },
+        edit: { action: 'edit-part', id: p.id },
+        label: t(p.received ? 'salary.markExpected' : 'salary.markReceived', { amount: foreign(p.amount, p.currency) }),
+        date: dayMonth(m.month, p.day),
+        title: foreign(p.amount, p.currency),
+        chips,
+        amount: `+${money(p.uah)}`,
+    });
 }
 
 function salaryCard(m) {
@@ -80,7 +84,6 @@ export function openPartSheet(id = null) {
             <div class="actions">
                 <button class="btn primary" type="submit">${isNew ? t('salary.addPartBtn') : t('common.save')}</button>
                 ${isNew ? '' : `<button class="btn danger" type="button" data-sheet="delete">${t('common.delete')}</button>`}
-                <button class="btn ghost" type="button" data-action="close-sheet">${t('common.cancel')}</button>
             </div>
         </form>`, { label: t('salary.title') });
 
@@ -136,7 +139,6 @@ export function openSalaryDaySheet() {
             <p class="form-error" id="form-error" role="alert" hidden></p>
             <div class="actions">
                 <button class="btn primary" type="submit">${t('common.save')}</button>
-                <button class="btn ghost" type="button" data-action="close-sheet">${t('common.cancel')}</button>
             </div>
         </form>`, { label: t('salary.dayTitle') });
     sheet.querySelector('#day-form').addEventListener('submit', ev => {
@@ -160,21 +162,25 @@ export function openSalaryDaySheet() {
 
 /* ---------- Надходження ---------- */
 
-function incomeRow(i, m) {
-    const from = i.debtor ? `<span>${esc(t('incomes.from', { name: i.debtor }))}</span>` : '';
+function incomeRow(i, m, color) {
     const received = i.isReceived !== false;
-    return `
-        <div class="item income-row">
-            <button class="check" role="checkbox" aria-checked="${received}" data-action="toggle-income" data-id="${i.id}"
-                aria-label="${esc(t(received ? 'incomes.markExpected' : 'incomes.markReceived', { title: i.title }))}"><span></span></button>
-            <button class="item-main" data-action="edit-income" data-id="${i.id}">
-                <span class="item-text">
-                    <span class="item-title">${esc(i.title)}</span>
-                    <span class="item-meta"><span class="num">${dayMonth(m.month, i.day || 1)}</span>${from}${received ? '' : `<span class="chip bridge">${t('incomes.expected')}</span>`}</span>
-                </span>
-                <span class="amount"><strong class="num">+${money(i.amountUAH)}</strong>${i.amountUSD > 0 ? `<span class="num">${foreign(i.amountUSD, i.currency || 'USD')}</span>` : ''}</span>
-            </button>
-        </div>`;
+    const chips = [
+        i.debtor ? `<span>${esc(t('incomes.from', { name: i.debtor }))}</span>` : '',
+        received ? '' : `<span class="chip bridge">${t('incomes.expected')}</span>`,
+    ].join('');
+    return itemRow({
+        cls: 'income-row',
+        checked: received,
+        check: { action: 'toggle-income', id: i.id },
+        edit: { action: 'edit-income', id: i.id },
+        label: t(received ? 'incomes.markExpected' : 'incomes.markReceived', { title: i.title }),
+        date: dayMonth(m.month, i.day || 1),
+        title: i.title,
+        color,
+        chips,
+        amount: `+${money(i.amountUAH)}`,
+        sub: i.amountUSD > 0 ? foreign(i.amountUSD, i.currency || 'USD') : '',
+    });
 }
 
 export function incomesView() {
@@ -192,7 +198,7 @@ export function incomesView() {
             <section class="section income-cat" data-income-cat="${c.id}">
                 <div class="section-head"><h2>${esc(c.name)}</h2><span class="meta num">${money(sum)}</span></div>
                 <div class="list">
-                    ${items.map(i => incomeRow(i, m)).join('') || `<div class="empty">${t('incomes.emptyCat')}</div>`}
+                    ${items.map(i => incomeRow(i, m, c.color)).join('') || `<div class="empty">${t('incomes.emptyCat')}</div>`}
                     <button class="add-row" data-action="add-income" data-category="${c.id}">${t('incomes.add')}</button>
                     ${carry}
                 </div>
@@ -263,7 +269,6 @@ export function openIncomeSheet(id = null, category = 'extra') {
             <div class="actions">
                 <button class="btn primary" type="submit">${isNew ? t('incomes.addBtn') : t('common.save')}</button>
                 ${isNew ? '' : `<button class="btn danger" type="button" data-sheet="delete">${t('common.delete')}</button>`}
-                <button class="btn ghost" type="button" data-action="close-sheet">${t('common.cancel')}</button>
             </div>
         </form>`, { label: isNew ? t('incomes.new') : i.title });
 

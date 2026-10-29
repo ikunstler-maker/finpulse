@@ -4,9 +4,10 @@ import { newId } from '../data/migrate.js';
 import { plural, t } from '../i18n/index.js';
 import { activeMonth, state, update } from '../state.js';
 import { currencyFields, readCurrency, wireCurrency } from './currency.js';
-import { dateOf, dayMonth, dayMonthLong, daysFrom, esc, foreign, money, money0, monthName } from './format.js';
+import { dateOf, dayMonth, dayMonthLong, daysFrom, esc, foreign, money, money0 } from './format.js';
 import { closeSheet, confirmSheet, openSheet, toast } from './sheet.js';
 import { goalsCard } from './goals.js';
+import { itemRow } from './row.js';
 import { view } from './view-state.js';
 
 const catOf = id => CATEGORIES.find(c => c.id === id) || CATEGORIES.find(c => c.id === 'other');
@@ -83,19 +84,19 @@ function expenseRow(e, m, monthKey, today, { bridge = false } = {}) {
         overdue && late <= 0 ? `<span class="chip late">${t('budget.overdue')}</span>` : '',
         bridge && !e.isPaid ? `<span class="chip bridge">${t('budget.bridgeChip')}</span>` : '',
     ].join('');
-    const foreignAmount = e.amountUSD > 0 ? `<span class="num">${foreign(e.amountUSD, e.currency || 'USD')}</span>` : '';
-    return `
-        <div class="item expense-row ${e.isPaid ? 'paid' : ''} ${overdue ? 'overdue' : ''}">
-            <button class="check" role="checkbox" aria-checked="${!!e.isPaid}" data-action="toggle-paid" data-month="${monthKey}" data-id="${e.id}"
-                aria-label="${esc(t(e.isPaid ? 'budget.markUnpaid' : 'budget.markPaid', { title: e.title }))}"><span></span></button>
-            <button class="item-main" data-action="edit-expense" data-month="${monthKey}" data-id="${e.id}">
-                <span class="item-text">
-                    <span class="item-title">${esc(e.title)}</span>
-                    <span class="item-meta"><span class="num">${dayMonth(m.month, e.payDay)}</span><span><i class="dot" style="background:${c.color}"></i>${esc(c.name)}</span>${chips}</span>
-                </span>
-                <span class="amount"><strong class="num">${money(e.amountUAH)}</strong>${foreignAmount}</span>
-            </button>
-        </div>`;
+    return itemRow({
+        cls: `expense-row ${e.isPaid ? 'paid' : ''} ${overdue ? 'overdue' : ''}`,
+        checked: e.isPaid,
+        check: { action: 'toggle-paid', month: monthKey, id: e.id },
+        edit: { action: 'edit-expense', month: monthKey, id: e.id },
+        label: t(e.isPaid ? 'budget.markUnpaid' : 'budget.markPaid', { title: e.title }),
+        date: dayMonth(m.month, e.payDay),
+        title: e.title,
+        color: c.color,
+        chips,
+        amount: money(e.amountUAH),
+        sub: e.amountUSD > 0 ? foreign(e.amountUSD, e.currency || 'USD') : '',
+    });
 }
 
 function group(id, title, rows, sum, hint = '') {
@@ -223,14 +224,12 @@ export function openFiltersSheet() {
     const sheet = openSheet(`
         <h3>${t('filters.title')}</h3>
         <form id="filters-form" novalidate>
-            <div class="field"><span class="lbl">${t('filters.show')}</span>
-                <div class="cats" role="group" aria-label="${t('filters.show')}">
-                    ${statuses.map(s => `<button type="button" data-status="${s}" aria-pressed="${f.status === s}">${statusLabel(s)}</button>`).join('')}
+            <div class="field-pair">
+                <div class="field"><label for="f-status">${t('filters.show')}</label>
+                    <select id="f-status">${statuses.map(s => `<option value="${s}" ${f.status === s ? 'selected' : ''}>${esc(statusLabel(s))}</option>`).join('')}</select>
                 </div>
-            </div>
-            <div class="field"><span class="lbl">${t('filters.sort')}</span>
-                <div class="cats" role="group" aria-label="${t('filters.sort')}">
-                    ${SORTS.map(s => `<button type="button" data-sort="${s}" aria-pressed="${f.sort === s}">${t(`filters.sorts.${s}`)}</button>`).join('')}
+                <div class="field"><label for="f-sort">${t('filters.sort')}</label>
+                    <select id="f-sort">${SORTS.map(s => `<option value="${s}" ${f.sort === s ? 'selected' : ''}>${t(`filters.sorts.${s}`)}</option>`).join('')}</select>
                 </div>
             </div>
             <div class="field-pair">
@@ -248,10 +247,6 @@ export function openFiltersSheet() {
             </div>
         </form>`, { label: t('filters.title') });
     sheet.addEventListener('click', ev => {
-        const st = ev.target.closest('[data-status]');
-        if (st) sheet.querySelectorAll('[data-status]').forEach(b => b.setAttribute('aria-pressed', b === st));
-        const so = ev.target.closest('[data-sort]');
-        if (so) sheet.querySelectorAll('[data-sort]').forEach(b => b.setAttribute('aria-pressed', b === so));
         const fc = ev.target.closest('[data-fcat]');
         if (fc) fc.setAttribute('aria-pressed', fc.getAttribute('aria-pressed') !== 'true');
         if (ev.target.closest('[data-sheet="reset"]')) {
@@ -264,8 +259,8 @@ export function openFiltersSheet() {
         const numOrNull = v => (v === '' ? null : Math.max(0, parseFloat(v)));
         view.filter = {
             ...view.filter,
-            status: sheet.querySelector('[data-status][aria-pressed="true"]').dataset.status,
-            sort: sheet.querySelector('[data-sort][aria-pressed="true"]').dataset.sort,
+            status: sheet.querySelector('#f-status').value,
+            sort: sheet.querySelector('#f-sort').value,
             min: numOrNull(sheet.querySelector('#f-min').value),
             max: numOrNull(sheet.querySelector('#f-max').value),
             categories: [...sheet.querySelectorAll('[data-fcat][aria-pressed="true"]')].map(b => b.dataset.fcat),
@@ -321,14 +316,14 @@ export function openExpenseSheet(monthKey = state.activeMonthKey, id = null) {
                 <input id="f-title" name="title" value="${esc(e.title)}" placeholder="${t('expense.titlePlaceholder')}" autocomplete="off" maxlength="120">
             </div>
             ${currencyFields({ currency, amount: currency === 'UAH' ? e.amountUAH : e.amountUSD, rate, uah: e.amountUAH, currencies: ['UAH', 'USD', 'USDT'] })}
-            <div class="field">
-                <label for="f-day">${t('expense.day', { month: monthName(month.year, month.month) })}</label>
-                <input id="f-day" type="number" inputmode="numeric" min="1" max="31" value="${e.payDay}">
-            </div>
-            <div class="field">
-                <span class="lbl">${t('expense.category')}</span>
-                <div class="cats" role="group" aria-label="${t('expense.category')}">
-                    ${CATEGORIES.map(c => `<button type="button" data-cat="${c.id}" aria-pressed="${c.id === e.category}"><i class="dot" style="background:${c.color}"></i>${esc(c.name)}</button>`).join('')}
+            <div class="field-pair day-cat">
+                <div class="field">
+                    <label for="f-day">${t('expense.dayShort', { month: t('months.short').split(',')[month.month - 1] })}</label>
+                    <input id="f-day" type="number" inputmode="numeric" min="1" max="31" value="${e.payDay}">
+                </div>
+                <div class="field">
+                    <label for="f-category">${t('expense.category')}</label>
+                    <select id="f-category">${CATEGORIES.map(c => `<option value="${c.id}" ${c.id === e.category ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select>
                 </div>
             </div>
             <div class="toggle"><span id="paid-label">${t('expense.paid')}</span><button type="button" class="switch" role="switch" id="f-paid" aria-checked="${!!e.isPaid}" aria-labelledby="paid-label"></button></div>
@@ -336,14 +331,11 @@ export function openExpenseSheet(monthKey = state.activeMonthKey, id = null) {
             <div class="actions">
                 <button class="btn primary" type="submit">${isNew ? t('expense.add') : t('common.save')}</button>
                 ${isNew ? '' : `<div class="two"><button class="btn ghost" type="button" data-sheet="duplicate">${t('expense.duplicate')}</button><button class="btn danger" type="button" data-sheet="delete">${t('common.delete')}</button></div>`}
-                <button class="btn ghost" type="button" data-action="close-sheet">${t('common.cancel')}</button>
             </div>
         </form>`, { label: isNew ? t('expense.new') : e.title });
 
     wireCurrency(sheet);
     sheet.addEventListener('click', ev => {
-        const cat = ev.target.closest('[data-cat]');
-        if (cat) sheet.querySelectorAll('[data-cat]').forEach(b => b.setAttribute('aria-pressed', b === cat));
         if (ev.target.closest('#f-paid')) {
             const sw = sheet.querySelector('#f-paid');
             sw.setAttribute('aria-checked', sw.getAttribute('aria-checked') !== 'true');
@@ -376,7 +368,7 @@ export function openExpenseSheet(monthKey = state.activeMonthKey, id = null) {
         if (!(day >= 1 && day <= 31)) return fail(t('expense.errDay'));
         const rec = {
             title,
-            category: sheet.querySelector('[data-cat][aria-pressed="true"]').dataset.cat,
+            category: sheet.querySelector('#f-category').value,
             amountUAH: amt.uah,
             amountUSD: amt.currency === 'UAH' ? 0 : amt.amount,
             payDay: day,
