@@ -60,6 +60,14 @@ export function createDrive(getToken, fetchFn = (...a) => globalThis.fetch(...a)
         return res.json();
     }
 
+    /** Файли прихованої папки, назва яких починається з prefix. */
+    async function list(prefix) {
+        const q = encodeURIComponent(`name contains '${prefix.replace(/'/g, "\\'")}' and trashed = false`);
+        const res = await call(`${API}?spaces=appDataFolder&q=${q}&fields=files(id,name,modifiedTime,size)&pageSize=100`);
+        const { files } = await res.json();
+        return files.filter(f => f.name.startsWith(prefix));
+    }
+
     async function remove(name) {
         const file = await findFile(name);
         if (!file) return false;
@@ -67,5 +75,5 @@ export function createDrive(getToken, fetchFn = (...a) => globalThis.fetch(...a)
         return true;
     }
 
-    return { findFile, readJSON, writeJSON, remove };
+    return { findFile, readJSON, writeJSON, list, remove };
 }

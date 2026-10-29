@@ -66,11 +66,16 @@ test('прототип: шифрування, запис у приховану �
     await p2.locator('#btn-open-password').click();
     await expect(p2.locator('#opened')).toContainText('Витрат: 14', { timeout: 20000 });
 
+    const logCount = async () => p2.locator('#log li').count();
+    let before = await logCount();
     await p2.locator('#open-secret').fill(recoveryKey.toLowerCase());
     await p2.locator('#btn-open-recovery').click();
+    await expect(p2.locator('#log li')).toHaveCount(before + 1, { timeout: 20000 });
     await expect(p2.locator('#log li').first()).toContainText('розшифровано');
 
+    before = await logCount();
     await p2.locator('#btn-delete').click();
+    await expect(p2.locator('#log li')).toHaveCount(before + 1);
     await expect(p2.locator('#log li').first()).toContainText('видалено');
     expect(store.file).toBeNull();
     await other.close();

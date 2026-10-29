@@ -7,6 +7,7 @@ import { currencyFields, readCurrency, wireCurrency } from './currency.js';
 import { dateOf, dayMonth, dayMonthLong, daysFrom, esc, foreign, money, money0 } from './format.js';
 import { closeSheet, confirmSheet, openSheet, toast } from './sheet.js';
 import { goalsCard } from './goals.js';
+import { isEncrypted } from '../sync/controller.js';
 import { itemRow } from './row.js';
 import { view } from './view-state.js';
 
@@ -51,7 +52,7 @@ export function summaryCard(today = new Date()) {
                 <div class="rowline free"><span>${t('summary.free')}<span class="sub">${t('summary.freeSub')}</span></span><span class="val num ${s.freeBalanceUAH < 0 ? 'neg' : ''}" id="kpi-free">${money(s.freeBalanceUAH)}</span></div>
             </div>
             ${periodsBlock()}
-            <p class="local-note">${t('summary.localNote')}</p>
+            <p class="local-note">${t(isEncrypted() ? 'summary.encryptedNote' : 'summary.localNote')}</p>
         </section>`;
 }
 
