@@ -4,6 +4,7 @@ import { newId } from '../data/migrate.js';
 import { createNextMonth } from '../data/months.js';
 import { t } from '../i18n/index.js';
 import { activeMonth, prepareState, saveState, setState, state, update } from '../state.js';
+import { isEncrypted } from '../sync/controller.js';
 import { esc, money } from './format.js';
 import { closeSheet, confirmSheet, openSheet, toast } from './sheet.js';
 
@@ -39,9 +40,10 @@ export function openMoreSheet() {
             <button data-action="open-reconcile"><strong>${t('more.reconcile')}</strong><span>${t('more.reconcileSub')}</span></button>
             <button data-action="open-months"><strong>${t('more.months')}</strong><span>${t('more.monthsSub', { month: esc(m.name) })}</span></button>
             <button data-action="open-theme"><strong>${t('more.theme')}</strong><span>${t(`theme.${getTheme()}`)}</span></button>
+            <button data-action="open-encryption"><strong>${t('more.encryption')}</strong><span>${t(isEncrypted() ? 'more.encryptionOn' : 'more.encryptionOff')}</span></button>
             <button data-action="open-backup"><strong>${t('more.backup')}</strong><span>${t('more.backupSub')}</span></button>
         </div>
-        <p class="local-note">${t('summary.localNote')}</p>
+        <p class="local-note">${t(isEncrypted() ? 'summary.encryptedNote' : 'summary.localNote')}</p>
         <div class="actions"><button class="btn ghost" data-action="close-sheet">${t('common.close')}</button></div>`, { label: t('more.title') });
 }
 

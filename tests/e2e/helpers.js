@@ -42,3 +42,54 @@ export async function openTab(page, tab) {
 export async function openMore(page) {
     await page.locator('[data-action="more"]:visible').click();
 }
+
+const GIS_FAKE = `
+window.google = { accounts: { oauth2: {
+    initTokenClient: cfg => ({ requestAccessToken: () => setTimeout(() => cfg.callback({ access_token: 'fake-token', expires_in: 3600 }), 0) }),
+    hasGrantedAllScopes: () => true,
+    revoke: (t, cb) => cb && cb(),
+} } };`;
+
+/**
+ * Fake Google sign-in and Drive appDataFolder shared between pages of one test.
+ * drive.files: Map name -> { id, body }.
+ */
+export async function fakeGoogle(context, drive = { files: new Map(), seq: 0 }) {
+    await context.route('https://accounts.google.com/gsi/client', r => r.fulfill({ contentType: 'application/javascript', body: GIS_FAKE }));
+    await context.route(/https:\/\/www\.googleapis\.com\/.*/, async r => {
+        const req = r.request();
+        const url = new URL(req.url());
+        const method = req.method();
+        if (req.headers().authorization !== 'Bearer fake-token') return r.fulfill({ status: 401, body: '{}' });
+        const byId = id => [...drive.files.entries()].find(([, f]) => f.id === id);
+        const meta = ([name, f]) => ({ id: f.id, name, size: String(f.body.length), modifiedTime: new Date().toISOString() });
+        if (method === 'GET' && url.pathname.endsWith('/files')) {
+            const q = url.searchParams.get('q') || '';
+            const exact = /name = '([^']+)'/.exec(q);
+            const contains = /name contains '([^']+)'/.exec(q);
+            const files = [...drive.files.entries()].filter(([name]) => (exact ? name === exact[1] : contains ? name.includes(contains[1]) : true));
+            return r.fulfill({ json: { files: files.map(meta) } });
+        }
+        const id = url.pathname.split('/files/')[1];
+        if (method === 'GET' && url.searchParams.get('alt') === 'media') return r.fulfill({ contentType: 'application/json', body: byId(id)[1].body });
+        if (method === 'POST') {
+            const parts = req.postData().split('\r\n\r\n');
+            const m = JSON.parse(parts[1].split('\r\n')[0]);
+            const f = { id: `f${++drive.seq}`, parents: m.parents, body: parts[2].split('\r\n--')[0] };
+            drive.files.set(m.name, f);
+            return r.fulfill({ json: { id: f.id, name: m.name } });
+        }
+        if (method === 'PATCH') {
+            const [name, f] = byId(id);
+            f.body = req.postData();
+            return r.fulfill({ json: { id, name } });
+        }
+        if (method === 'DELETE') {
+            const [name] = byId(id);
+            drive.files.delete(name);
+            return r.fulfill({ status: 204, body: '' });
+        }
+        return r.fulfill({ status: 404, body: '{}' });
+    });
+    return drive;
+}

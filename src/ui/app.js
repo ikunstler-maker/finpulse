@@ -6,11 +6,13 @@ import { openGoalSheet, openMoveSheet } from './goals.js';
 import { dayMonth } from './format.js';
 import { incomesView, openIncomeSheet, openPartSheet, openSalaryDaySheet, takeSavingsFromPrevious, toggleIncome, togglePart } from './incomes.js';
 import {
-    applyTheme, createNextMonthFromActive, openBackupSheet, openMonthsSheet, openMoreSheet, openReconcileSheet,
+    createNextMonthFromActive, openBackupSheet, openMonthsSheet, openMoreSheet, openReconcileSheet,
     openThemeSheet, selectMonth, stepMonth,
 } from './more.js';
 import { reportsView } from './reports.js';
 import { closeSheet, sheetOpen } from './sheet.js';
+import { onSyncStatus } from '../sync/controller.js';
+import { chipAction, openEncryption, syncChip } from './sync-ui.js';
 import { view } from './view-state.js';
 
 const $ = id => document.getElementById(id);
@@ -22,7 +24,17 @@ function cycleRange(m) {
     return `${dayMonth(m.month, m.salaryDay)} – ${dayMonth(endMonth, endDay)}`;
 }
 
+function renderChip() {
+    const chip = $('sync-chip');
+    const c = syncChip();
+    chip.hidden = !c;
+    if (!c) return;
+    chip.textContent = c.text;
+    chip.dataset.state = c.state;
+}
+
 export function render() {
+    renderChip();
     const m = activeMonth();
     $('cycle-name').textContent = m.name;
     $('cycle-range').textContent = cycleRange(m);
@@ -86,6 +98,8 @@ const actions = {
     'open-reconcile': () => openReconcileSheet(),
     'open-theme': () => openThemeSheet(),
     'open-backup': () => openBackupSheet(),
+    'open-encryption': () => openEncryption(),
+    'sync-chip': () => chipAction(),
 };
 
 function applyStaticTexts() {
@@ -95,9 +109,9 @@ function applyStaticTexts() {
 }
 
 export function startApp() {
-    applyTheme();
     applyStaticTexts();
     onStateChange(render);
+    onSyncStatus(renderChip);
     setBudgetRerender(render);
     document.addEventListener('click', e => {
         const el = e.target.closest('[data-action]');

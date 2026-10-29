@@ -32,12 +32,28 @@ export function loadState() {
     return prepareState(getDefaultInitialState());
 }
 
-export function saveState() {
+function savePlain(s) {
     try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
     } catch (e) {
         console.error('Помилка збереження стану:', e);
     }
+}
+
+/** Як зберігати дані: відкрито в браузері (за замовчуванням) або зашифровано (див. src/sync). */
+let persister = savePlain;
+export function setPersister(fn) {
+    persister = fn || savePlain;
+}
+
+export function saveState() {
+    persister(state);
+}
+
+export function removePlainCopy() {
+    try {
+        localStorage.removeItem(STORAGE_KEY);
+    } catch { /* немає доступу до сховища — нічого видаляти */ }
 }
 
 export function setState(next) {
@@ -54,6 +70,12 @@ export function update(fn) {
     fn(state);
     Object.values(state.months).forEach(syncSalaryFields);
     saveState();
+    listener();
+}
+
+/** Замінити дані без повторного збереження (дані вже збережено, наприклад отримано з Диска). */
+export function replaceState(next) {
+    state = next;
     listener();
 }
 
