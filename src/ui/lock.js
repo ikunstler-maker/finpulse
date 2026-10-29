@@ -27,6 +27,7 @@ export function showLockScreen(onUnlocked) {
             <button class="btn primary" type="submit" id="lock-submit">${t('lock.open')}</button>
             <button class="link-btn" type="button" id="lock-mode">${t('lock.useRecovery')}</button>
             <button class="link-btn muted-link" type="button" id="lock-forget">${t('lock.forget')}</button>
+            <p class="links"><a href="./security.html">${t('links.security')}</a> · <a href="./privacy.html">${t('links.privacy')}</a></p>
         </form>`;
     document.body.appendChild(el);
     document.documentElement.classList.add('locked');

@@ -6,7 +6,8 @@ import { activeMonth, state, update } from '../state.js';
 import { currencyFields, readCurrency, wireCurrency } from './currency.js';
 import { dateOf, dayMonth, dayMonthLong, daysFrom, esc, foreign, money, money0 } from './format.js';
 import { closeSheet, confirmSheet, openSheet, toast } from './sheet.js';
-import { goalsCard } from './goals.js';
+import { goalsRow } from './goals.js';
+import { demoBanner } from './welcome.js';
 import { isEncrypted } from '../sync/controller.js';
 import { itemRow } from './row.js';
 import { view } from './view-state.js';
@@ -52,6 +53,7 @@ export function summaryCard(today = new Date()) {
                 <div class="rowline free"><span>${t('summary.free')}<span class="sub">${t('summary.freeSub')}</span></span><span class="val num ${s.freeBalanceUAH < 0 ? 'neg' : ''}" id="kpi-free">${money(s.freeBalanceUAH)}</span></div>
             </div>
             ${periodsBlock()}
+            ${goalsRow()}
             <p class="local-note">${t(isEncrypted() ? 'summary.encryptedNote' : 'summary.localNote')}</p>
         </section>`;
 }
@@ -76,15 +78,11 @@ function periodsBlock() {
 
 /* ---------- Список витрат ---------- */
 
-function expenseRow(e, m, monthKey, today, { bridge = false } = {}) {
+function expenseRow(e, m, monthKey, today, { bridge = false, flat = false } = {}) {
     const c = catOf(e.category);
     const overdue = !e.isPaid && isExpenseOverdue(e, m, today);
-    const late = overdue ? -daysFrom(today, dateOf(m, e.payDay)) : 0;
-    const chips = [
-        overdue && late > 0 ? `<span class="chip late">${t('budget.overdueDays', { n: late })}</span>` : '',
-        overdue && late <= 0 ? `<span class="chip late">${t('budget.overdue')}</span>` : '',
-        bridge && !e.isPaid ? `<span class="chip bridge">${t('budget.bridgeChip')}</span>` : '',
-    ].join('');
+    // У групах стан видно із заголовка; у результатах пошуку позначаємо лише «до ЗП».
+    const chips = flat && bridge && !e.isPaid ? `<span class="chip bridge">${t('budget.bridgeChip')}</span>` : '';
     return itemRow({
         cls: `expense-row ${e.isPaid ? 'paid' : ''} ${overdue ? 'overdue' : ''}`,
         checked: e.isPaid,
@@ -170,7 +168,7 @@ export function budgetView(today = new Date()) {
         content = `
             <section class="section" data-group="results">
                 <div class="section-head"><h2>${t('filters.results')}</h2><span class="meta num">${found.length} · ${money(found.reduce((s, x) => s + x.e.amountUAH, 0))}</span></div>
-                <div class="list">${found.map(x => expenseRow(x.e, x.month, x.monthKey, today, { bridge: x.bridge })).join('') || `<p class="empty">${t('filters.nothing')}</p>`}</div>
+                <div class="list">${found.map(x => expenseRow(x.e, x.month, x.monthKey, today, { bridge: x.bridge, flat: true })).join('') || `<p class="empty">${t('filters.nothing')}</p>`}</div>
                 <button class="link-btn" data-action="reset-filters">${t('filters.reset')}</button>
             </section>`;
     } else {
@@ -196,8 +194,9 @@ export function budgetView(today = new Date()) {
         : '';
 
     return `
-        <div class="rail">${summaryCard(today)}${goalsCard()}</div>
+        <div class="rail">${summaryCard(today)}</div>
         <div class="main-col">
+            ${demoBanner()}
             ${m.expenses.length ? toolbar() : ''}
             ${categoryChips(presentCats)}
             ${filterNote}

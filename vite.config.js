@@ -9,6 +9,9 @@ export default defineConfig({
             input: {
                 main: resolve(import.meta.dirname, 'index.html'),
                 prototype: resolve(import.meta.dirname, 'prototype.html'),
+                privacy: resolve(import.meta.dirname, 'privacy.html'),
+                terms: resolve(import.meta.dirname, 'terms.html'),
+                security: resolve(import.meta.dirname, 'security.html'),
             },
         },
     },

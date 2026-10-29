@@ -54,7 +54,7 @@ export function openSetup() {
             <li>${t('setup.step2')}</li>
             <li>${t('setup.step3')}</li>
         </ol>
-        <p class="sheet-text">${t('setup.warning')}</p>
+        <p class="sheet-text">${t('setup.warning')} <a href="./security.html">${t('links.security')}</a></p>
         <div class="actions">
             <button class="btn ghost" type="button" id="setup-backup">${t('setup.backup')}</button>
             <button class="btn primary" type="button" id="setup-next" disabled>${t('setup.google')}</button>

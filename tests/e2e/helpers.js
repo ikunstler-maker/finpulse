@@ -4,8 +4,9 @@ export const TODAY = new Date('2026-10-29T12:00:00+02:00');
 export const STORAGE_KEY = 'finpulse_app_state_v3';
 
 /** Opens the app on a fixed date; collects page errors; optionally seeds saved data. */
-export async function openApp(page, { seed } = {}) {
+export async function openApp(page, { seed, firstRun = false } = {}) {
     const errors = [];
+    if (!firstRun) await page.addInitScript(() => { try { localStorage.setItem('finpulse_onboarded', '1'); } catch { /* ignore */ } });
     page.on('pageerror', e => errors.push(e.message));
     page.on('console', m => { if (m.type() === 'error' && /Content Security Policy/i.test(m.text())) errors.push(m.text()); });
     await page.clock.setFixedTime(TODAY);

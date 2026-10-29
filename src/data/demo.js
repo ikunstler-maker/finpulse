@@ -7,6 +7,7 @@ export function getDefaultInitialState() {
     // Fictional demo data: no real people, amounts or services of the owner.
     const state = {
         version: 4,
+        demo: true,
         activeMonthKey: '2026-10',
         appMode: 'view', // 'view' або 'edit'
         months: {

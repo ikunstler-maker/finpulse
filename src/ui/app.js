@@ -2,17 +2,19 @@ import { getNextMonthKey } from '../calc.js';
 import { t } from '../i18n/index.js';
 import { activeMonth, onStateChange, state } from '../state.js';
 import { budgetView, openExpenseSheet, openFiltersSheet, resetFilters, setBudgetRerender, togglePaid } from './budget.js';
-import { openGoalSheet, openMoveSheet } from './goals.js';
+import { openGoalSheet, openGoalsSheet, openMoveSheet } from './goals.js';
 import { dayMonth } from './format.js';
 import { incomesView, openIncomeSheet, openPartSheet, openSalaryDaySheet, takeSavingsFromPrevious, toggleIncome, togglePart } from './incomes.js';
 import {
     createNextMonthFromActive, openBackupSheet, openMonthsSheet, openMoreSheet, openReconcileSheet,
-    openThemeSheet, selectMonth, stepMonth,
+    openDensitySheet, openThemeSheet, selectMonth, stepMonth,
 } from './more.js';
 import { reportsView } from './reports.js';
 import { closeSheet, sheetOpen } from './sheet.js';
 import { onSyncStatus } from '../sync/controller.js';
 import { chipAction, openEncryption, syncChip } from './sync-ui.js';
+import { demoKeep, demoStartFresh, openWelcome } from './welcome.js';
+import { isFirstRun } from '../state.js';
 import { view } from './view-state.js';
 
 const $ = id => document.getElementById(id);
@@ -77,6 +79,7 @@ const actions = {
     'filter-category': el => { view.filter.categories = el.dataset.category === 'all' ? [] : [el.dataset.category]; render(); },
     'open-filters': () => openFiltersSheet(),
     'reset-filters': () => resetFilters(),
+    'open-goals': () => openGoalsSheet(),
     'new-goal': () => openGoalSheet(),
     'edit-goal': el => openGoalSheet(el.dataset.id),
     'move-goal': el => openMoveSheet(el.dataset.id),
@@ -97,9 +100,12 @@ const actions = {
     'create-next-month': () => createNextMonthFromActive(),
     'open-reconcile': () => openReconcileSheet(),
     'open-theme': () => openThemeSheet(),
+    'open-density': () => openDensitySheet(),
     'open-backup': () => openBackupSheet(),
     'open-encryption': () => openEncryption(),
     'sync-chip': () => chipAction(),
+    'demo-start': () => demoStartFresh(),
+    'demo-keep': () => demoKeep(),
 };
 
 function applyStaticTexts() {
@@ -135,4 +141,5 @@ export function startApp() {
         if (e.key === 'Escape' && sheetOpen()) closeSheet();
     });
     render();
+    if (isFirstRun) openWelcome();
 }

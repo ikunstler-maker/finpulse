@@ -8,14 +8,23 @@ import { closeSheet, confirmSheet, openSheet, toast } from './sheet.js';
 /**
  * ЦІЛІ (КОНВЕРТИ): куди відкласти вільний залишок.
  */
-export function goalsCard() {
+/** Компактний рядок у підсумку: скільки цілей і скільки відкладено; відкриває вікно цілей. */
+export function goalsRow() {
+    const goals = state.goals || [];
+    const saved = goals.reduce((s, g) => s + goalBalance(state, g.id), 0);
+    const label = goals.length ? t('goals.rowSummary', { n: goals.length, amount: money0(saved) }) : t('goals.rowEmpty');
+    return `<button class="goals-row" data-action="open-goals"><span>${t('goals.title')}</span><span class="num">${label} ›</span></button>`;
+}
+
+/** Вікно з усіма цілями: прогрес, «Відкласти», нова ціль. */
+export function openGoalsSheet() {
     const goals = state.goals || [];
     const free = computeMonthSummary(state, state.activeMonthKey).freeBalanceUAH;
     const hint = free > 0 ? t('goals.freeHint', { amount: money0(free) }) : t('goals.noFree');
-    return `
-        <section class="goals" aria-label="${t('goals.title')}">
-            <div class="goals-head"><h2>${t('goals.title')}</h2><button class="link-btn" data-action="new-goal">${t('goals.new')}</button></div>
-            ${goals.length ? '' : `<p class="goals-empty">${t('goals.empty')}</p>`}
+    openSheet(`
+        <h3>${t('goals.title')}</h3>
+        <p class="sheet-text">${goals.length ? hint : t('goals.empty')}</p>
+        <div class="goals-list">
             ${goals.map(g => {
                 const p = goalProgress(state, g);
                 return `
@@ -27,8 +36,8 @@ export function goalsCard() {
                         <button class="btn ghost small-btn" data-action="move-goal" data-id="${g.id}">${t('goals.put')}</button>
                     </div>`;
             }).join('')}
-            ${goals.length ? `<p class="goals-hint">${hint}</p>` : ''}
-        </section>`;
+        </div>
+        <div class="actions"><button class="btn ${goals.length ? 'ghost' : 'primary'}" data-action="new-goal">${t('goals.new')}</button></div>`, { label: t('goals.title') });
 }
 
 export function openGoalSheet(id = null) {
