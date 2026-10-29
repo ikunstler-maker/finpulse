@@ -40,7 +40,7 @@ test('нова витрата в доларах через панель', async 
     await page.locator('#f-uah').fill('420');
     await expect(page.locator('#f-rate')).toHaveValue('42');
     await page.locator('#f-day').fill('30');
-    await page.locator('[data-cat="subscriptions"]').click();
+    await page.locator('#f-category').selectOption('subscriptions');
     await page.locator('#expense-form button[type=submit]').click();
     const r = row(page, 'Хостинг');
     await expect(r).toContainText('420,00 ₴');
@@ -243,4 +243,39 @@ test('кожна вкладка без горизонтальної прокру
         .filter(el => el.offsetParent).map(el => el.getBoundingClientRect()).filter(r => r.height < 44 || r.width < 44).length);
     expect(small).toBe(0);
     expect(errors).toEqual([]);
+});
+
+test('компактний рядок: дата під чекбоксом, без назви категорії, довга назва у два рядки', async ({ page }) => {
+    await openApp(page);
+    const r = row(page, 'Оренда квартири');
+    await expect(r.locator('.check .item-date')).toHaveText('10 жовт');
+    await expect(r.locator('.item-title .dot')).toHaveCount(1);
+    await expect(r).not.toContainText('Оренда та ЖКГ');
+    await expect(r.locator('.item-meta')).toContainText('прострочено');
+
+    await page.locator('#fab').click();
+    await page.locator('#f-title').fill('Дуже довга назва витрати, яка не поміщається в один рядок на телефоні і має перенестися');
+    await page.locator('#f-amount').fill('10');
+    await page.locator('#expense-form button[type=submit]').click();
+    const title = row(page, 'Дуже довга назва').locator('.item-title');
+    const lh = await title.evaluate(el => parseFloat(getComputedStyle(el).lineHeight));
+    const h = (await title.boundingBox()).height;
+    expect(h).toBeLessThanOrEqual(lh * 2 + 1);
+});
+
+test('вікно редагування: по центру, закривається хрестиком, сторінка під ним не прокручується', async ({ page }) => {
+    await openApp(page);
+    await row(page, 'Спортзал').locator('[data-action="edit-expense"]').click();
+    const sheet = page.locator('.sheet');
+    await expect(sheet).toBeVisible();
+    await expect(page.locator('html')).toHaveClass(/modal-open/);
+    expect(await page.evaluate(() => getComputedStyle(document.body).overflow)).toBe('hidden');
+    const box = await sheet.boundingBox();
+    const vp = page.viewportSize();
+    expect(box.y).toBeGreaterThan(0);
+    expect(box.y + box.height).toBeLessThanOrEqual(vp.height);
+    await expect(page.locator('#f-category')).toHaveValue('health');
+    await page.locator('.sheet-close').click();
+    await expect(sheet).toHaveCount(0);
+    await expect(page.locator('html')).not.toHaveClass(/modal-open/);
 });

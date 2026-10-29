@@ -10,17 +10,21 @@ export function openSheet(html, { label } = {}) {
     const layer = document.getElementById('layer');
     layer.innerHTML = `
         <div class="scrim" data-action="close-sheet"></div>
-        <div class="sheet" role="dialog" aria-modal="true" aria-label="${label || ''}">
-            <div class="grab" aria-hidden="true"></div>
+        <div class="sheet" role="dialog" aria-modal="true" aria-label="${label || ''}" tabindex="-1">
+            <button class="sheet-close" type="button" data-action="close-sheet" aria-label="${t('common.closeWindow')}">✕</button>
             ${html}
         </div>`;
+    document.documentElement.classList.add('modal-open');
     const sheet = layer.querySelector('.sheet');
-    sheet.querySelector('input, select, button:not([data-action="close-sheet"])')?.focus({ preventScroll: true });
+    // Фокус на саме вікно, а не на поле: на телефоні клавіатура не вискакує одразу.
+    sheet.focus({ preventScroll: true });
+    sheet.scrollTop = 0;
     return sheet;
 }
 
 export function closeSheet() {
     document.getElementById('layer').innerHTML = '';
+    document.documentElement.classList.remove('modal-open');
     returnFocus?.focus?.({ preventScroll: true });
     returnFocus = null;
 }

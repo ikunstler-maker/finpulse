@@ -9,8 +9,8 @@ test('пошук, фільтри і сортування витрат', async ({
     await page.locator('#expense-search').fill('');
 
     await page.locator('[data-action="open-filters"]').click();
-    await page.locator('[data-status="unpaid"]').click();
-    await page.locator('[data-sort="amountDesc"]').click();
+    await page.locator('#f-status').selectOption('unpaid');
+    await page.locator('#f-sort').selectOption('amountDesc');
     await page.locator('#f-min').fill('1000');
     await page.locator('#filters-form button[type=submit]').click();
     const titles = await page.locator('[data-group="results"] .item-title').allTextContents();
@@ -18,9 +18,9 @@ test('пошук, фільтри і сортування витрат', async ({
     await expect(page.locator('.filter-btn .badge')).toHaveText('3');
 
     await page.locator('[data-action="open-filters"]').click();
-    await page.locator('[data-status="bridge"]').click();
+    await page.locator('#f-status').selectOption('bridge');
     await page.locator('#f-min').fill('');
-    await page.locator('[data-sort="alpha"]').click();
+    await page.locator('#f-sort').selectOption('alpha');
     await page.locator('#filters-form button[type=submit]').click();
     expect(await page.locator('[data-group="results"] .item-title').allTextContents()).toEqual(['Музичний сервіс', 'Хмарне сховище']);
 
@@ -74,7 +74,7 @@ test('дві виплати: аванс і основна показуються
     // кінцевий залишок другого періоду = вільний залишок
     expect((await periods.nth(1).locator('.val').textContent()).replace(/\s/g, ' ')).toBe((await text(page, '#kpi-free')));
     await page.locator('[data-action="open-filters"]').click();
-    await expect(page.locator('[data-status="period1"]')).toHaveText('До виплати 15-го');
+    await expect(page.locator('#f-status option[value="period1"]')).toHaveText('До виплати 15-го');
 });
 
 test('підказка курсу: підставляє курс і рахує гривні', async ({ page }) => {

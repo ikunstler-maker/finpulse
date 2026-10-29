@@ -45,7 +45,6 @@ export function openGoalSheet(id = null) {
             <div class="actions">
                 <button class="btn primary" type="submit">${isNew ? t('goals.create') : t('common.save')}</button>
                 ${isNew ? '' : `<button class="btn danger" type="button" data-sheet="delete">${t('goals.delete')}</button>`}
-                <button class="btn ghost" type="button" data-action="close-sheet">${t('common.cancel')}</button>
             </div>
         </form>`, { label: t('goals.title') });
     sheet.addEventListener('click', ev => {
@@ -100,7 +99,6 @@ export function openMoveSheet(id) {
             <p class="form-error" id="form-error" role="alert" hidden></p>
             <div class="actions">
                 <button class="btn primary" type="submit">${t('common.save')}</button>
-                <button class="btn ghost" type="button" data-action="close-sheet">${t('common.cancel')}</button>
             </div>
         </form>`, { label: goal.name });
     sheet.addEventListener('click', ev => {
