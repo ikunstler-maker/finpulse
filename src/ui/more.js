@@ -81,6 +81,7 @@ export function openMoreSheet() {
             <button data-action="open-backup"><strong>${t('more.backup')}</strong><span>${t('more.backupSub')}</span></button>
         </div>
         <p class="local-note">${t(isEncrypted() ? 'summary.encryptedNote' : 'summary.localNote')}</p>
+        <p class="links"><a href="./security.html">${t('links.security')}</a> · <a href="./privacy.html">${t('links.privacy')}</a> · <a href="./terms.html">${t('links.terms')}</a></p>
         <div class="actions"><button class="btn ghost" data-action="close-sheet">${t('common.close')}</button></div>`, { label: t('more.title') });
 }
 

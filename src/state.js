@@ -17,6 +17,23 @@ export function prepareState(raw) {
     return clean;
 }
 
+const ONBOARDED_KEY = 'finpulse_onboarded';
+
+/** Перший візит: немає ні збережених даних, ні сховища, і людина ще не обрала, з чого почати. */
+export const isFirstRun = (() => {
+    try {
+        return !localStorage.getItem(STORAGE_KEY) && !localStorage.getItem('finpulse_vault_v1') && !localStorage.getItem(ONBOARDED_KEY);
+    } catch {
+        return false;
+    }
+})();
+
+export function markOnboarded() {
+    try {
+        localStorage.setItem(ONBOARDED_KEY, '1');
+    } catch { /* приватний режим — запитаємо ще раз наступного разу */ }
+}
+
 export let state = loadState();
 
 export function loadState() {

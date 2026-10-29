@@ -13,6 +13,8 @@ import { reportsView } from './reports.js';
 import { closeSheet, sheetOpen } from './sheet.js';
 import { onSyncStatus } from '../sync/controller.js';
 import { chipAction, openEncryption, syncChip } from './sync-ui.js';
+import { demoKeep, demoStartFresh, openWelcome } from './welcome.js';
+import { isFirstRun } from '../state.js';
 import { view } from './view-state.js';
 
 const $ = id => document.getElementById(id);
@@ -102,6 +104,8 @@ const actions = {
     'open-backup': () => openBackupSheet(),
     'open-encryption': () => openEncryption(),
     'sync-chip': () => chipAction(),
+    'demo-start': () => demoStartFresh(),
+    'demo-keep': () => demoKeep(),
 };
 
 function applyStaticTexts() {
@@ -137,4 +141,5 @@ export function startApp() {
         if (e.key === 'Escape' && sheetOpen()) closeSheet();
     });
     render();
+    if (isFirstRun) openWelcome();
 }

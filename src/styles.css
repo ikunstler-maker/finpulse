@@ -405,3 +405,13 @@ html[data-density="compact"] .section { margin-top: 12px; }
 html[data-density="compact"] .summary { padding: 14px; gap: 10px; }
 html[data-density="compact"] .rowline { padding-block: 6px; }
 html[data-density="compact"] .big { font-size: clamp(24px, 7vw, 32px); }
+
+/* Demo banner and footer links */
+.demo-banner {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px;
+    background: var(--bridge-soft); color: var(--fg); border-radius: 12px; padding: 6px 12px; margin-bottom: 12px; font-size: 14px; font-weight: 600;
+}
+.demo-actions { display: flex; gap: 12px; }
+.links { margin: 6px 0 0; font-size: 13px; color: var(--muted); }
+.links a { color: var(--accent); font-weight: 600; }
+.sheet a { color: var(--accent); }

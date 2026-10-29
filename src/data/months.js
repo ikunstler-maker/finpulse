@@ -34,3 +34,13 @@ export function createNextMonth(state, key) {
     state.months[nextKey] = next;
     return nextKey;
 }
+
+/** Порожній бюджет на поточний місяць (для нових людей). */
+export function createEmptyState(today = new Date(), rate = 41.5) {
+    const y = today.getFullYear();
+    const m = today.getMonth() + 1;
+    const key = `${y}-${String(m).padStart(2, '0')}`;
+    const month = { year: y, month: m, name: monthName(y, m), salaryDay: 1, incomeUAH: 0, rate, salaryParts: [], incomes: [], expenses: [] };
+    ensurePresetIncomes(month);
+    return { version: 4, activeMonthKey: key, months: { [key]: month } };
+}

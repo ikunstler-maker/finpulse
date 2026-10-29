@@ -7,6 +7,7 @@ import { currencyFields, readCurrency, wireCurrency } from './currency.js';
 import { dateOf, dayMonth, dayMonthLong, daysFrom, esc, foreign, money, money0 } from './format.js';
 import { closeSheet, confirmSheet, openSheet, toast } from './sheet.js';
 import { goalsRow } from './goals.js';
+import { demoBanner } from './welcome.js';
 import { isEncrypted } from '../sync/controller.js';
 import { itemRow } from './row.js';
 import { view } from './view-state.js';
@@ -195,6 +196,7 @@ export function budgetView(today = new Date()) {
     return `
         <div class="rail">${summaryCard(today)}</div>
         <div class="main-col">
+            ${demoBanner()}
             ${m.expenses.length ? toolbar() : ''}
             ${categoryChips(presentCats)}
             ${filterNote}
