@@ -251,7 +251,8 @@ test('компактний рядок: дата під чекбоксом, бе�
     await expect(r.locator('.check .item-date')).toHaveText('10 жовт');
     await expect(r.locator('.item-title .dot')).toHaveCount(1);
     await expect(r).not.toContainText('Оренда та ЖКГ');
-    await expect(r.locator('.item-meta')).toContainText('прострочено');
+    await expect(r.locator('.item-meta')).toHaveCount(0); // без позначки «прострочено N дн.»
+    await expect(r).toHaveClass(/overdue/); // дата й рамка червоні
 
     await page.locator('#fab').click();
     await page.locator('#f-title').fill('Дуже довга назва витрати, яка не поміщається в один рядок на телефоні і має перенестися');

@@ -2,12 +2,12 @@ import { getNextMonthKey } from '../calc.js';
 import { t } from '../i18n/index.js';
 import { activeMonth, onStateChange, state } from '../state.js';
 import { budgetView, openExpenseSheet, openFiltersSheet, resetFilters, setBudgetRerender, togglePaid } from './budget.js';
-import { openGoalSheet, openMoveSheet } from './goals.js';
+import { openGoalSheet, openGoalsSheet, openMoveSheet } from './goals.js';
 import { dayMonth } from './format.js';
 import { incomesView, openIncomeSheet, openPartSheet, openSalaryDaySheet, takeSavingsFromPrevious, toggleIncome, togglePart } from './incomes.js';
 import {
     createNextMonthFromActive, openBackupSheet, openMonthsSheet, openMoreSheet, openReconcileSheet,
-    openThemeSheet, selectMonth, stepMonth,
+    openDensitySheet, openThemeSheet, selectMonth, stepMonth,
 } from './more.js';
 import { reportsView } from './reports.js';
 import { closeSheet, sheetOpen } from './sheet.js';
@@ -77,6 +77,7 @@ const actions = {
     'filter-category': el => { view.filter.categories = el.dataset.category === 'all' ? [] : [el.dataset.category]; render(); },
     'open-filters': () => openFiltersSheet(),
     'reset-filters': () => resetFilters(),
+    'open-goals': () => openGoalsSheet(),
     'new-goal': () => openGoalSheet(),
     'edit-goal': el => openGoalSheet(el.dataset.id),
     'move-goal': el => openMoveSheet(el.dataset.id),
@@ -97,6 +98,7 @@ const actions = {
     'create-next-month': () => createNextMonthFromActive(),
     'open-reconcile': () => openReconcileSheet(),
     'open-theme': () => openThemeSheet(),
+    'open-density': () => openDensitySheet(),
     'open-backup': () => openBackupSheet(),
     'open-encryption': () => openEncryption(),
     'sync-chip': () => chipAction(),

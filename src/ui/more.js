@@ -32,6 +32,42 @@ export function setTheme(theme) {
     applyTheme(theme);
 }
 
+const DENSITY_KEY = 'finpulse_density';
+
+export function getDensity() {
+    try {
+        return localStorage.getItem(DENSITY_KEY) === 'compact' ? 'compact' : 'normal';
+    } catch {
+        return 'normal';
+    }
+}
+
+export function applyDensity(density = getDensity()) {
+    if (density === 'compact') document.documentElement.dataset.density = 'compact';
+    else delete document.documentElement.dataset.density;
+}
+
+export function openDensitySheet() {
+    const cur = getDensity();
+    const sheet = openSheet(`
+        <h3>${t('more.density')}</h3>
+        <p class="sheet-text">${t('more.densityHint')}</p>
+        <div class="seg wide" role="group" aria-label="${t('more.density')}">
+            ${['normal', 'compact'].map(k => `<button type="button" data-density-set="${k}" aria-pressed="${k === cur}">${t(`density.${k}`)}</button>`).join('')}
+        </div>
+        <div class="actions"><button class="btn ghost" data-action="close-sheet">${t('common.done')}</button></div>`, { label: t('more.density') });
+    sheet.addEventListener('click', e => {
+        const b = e.target.closest('[data-density-set]');
+        if (!b) return;
+        try {
+            if (b.dataset.densitySet === 'compact') localStorage.setItem(DENSITY_KEY, 'compact');
+            else localStorage.removeItem(DENSITY_KEY);
+        } catch { /* вигляд просто не запам'ятається */ }
+        applyDensity(b.dataset.densitySet);
+        sheet.querySelectorAll('[data-density-set]').forEach(x => x.setAttribute('aria-pressed', x === b));
+    });
+}
+
 export function openMoreSheet() {
     const m = activeMonth();
     openSheet(`
@@ -40,6 +76,7 @@ export function openMoreSheet() {
             <button data-action="open-reconcile"><strong>${t('more.reconcile')}</strong><span>${t('more.reconcileSub')}</span></button>
             <button data-action="open-months"><strong>${t('more.months')}</strong><span>${t('more.monthsSub', { month: esc(m.name) })}</span></button>
             <button data-action="open-theme"><strong>${t('more.theme')}</strong><span>${t(`theme.${getTheme()}`)}</span></button>
+            <button data-action="open-density"><strong>${t('more.density')}</strong><span>${t(`density.${getDensity()}`)}</span></button>
             <button data-action="open-encryption"><strong>${t('more.encryption')}</strong><span>${t(isEncrypted() ? 'more.encryptionOn' : 'more.encryptionOff')}</span></button>
             <button data-action="open-backup"><strong>${t('more.backup')}</strong><span>${t('more.backupSub')}</span></button>
         </div>

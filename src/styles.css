@@ -376,3 +376,32 @@ html.locked body > .app, html.locked .nav, html.locked .fab { visibility: hidden
     font: 700 15px/1.6 ui-monospace, Menlo, Consolas, monospace; word-break: break-word; user-select: all;
 }
 .btn:disabled { opacity: .5; cursor: not-allowed; }
+
+/* Goals row in the summary */
+.goals-row {
+    display: flex; justify-content: space-between; align-items: center; gap: 10px; width: 100%; min-height: var(--tap);
+    border: 1px solid var(--line); background: var(--surface-2); border-radius: 12px; padding: 0 12px; font-weight: 700; font-size: 14px;
+}
+.goals-row .num { color: var(--muted); font-weight: 600; font-size: 13px; }
+.goals-list { display: grid; gap: 6px; margin-bottom: 8px; }
+
+/* Space between the summary and the list on phones */
+@media (max-width: 959px) {
+    .main-col { margin-top: 16px; }
+}
+
+/* Compact view: more records on screen */
+html[data-density="compact"] .item { min-height: 44px; }
+html[data-density="compact"] .check { min-height: 44px; padding: 3px 0; gap: 1px; }
+html[data-density="compact"] .check .box { width: 18px; height: 18px; border-radius: 5px; }
+html[data-density="compact"] .item-main { padding: 4px 0; }
+html[data-density="compact"] .item-title { -webkit-line-clamp: 1; font-size: 14px; }
+html[data-density="compact"] .amount strong { font-size: 14px; }
+html[data-density="compact"] .group-hint,
+html[data-density="compact"] .bar-legend,
+html[data-density="compact"] .rowline .sub,
+html[data-density="compact"] .local-note { display: none; }
+html[data-density="compact"] .section { margin-top: 12px; }
+html[data-density="compact"] .summary { padding: 14px; gap: 10px; }
+html[data-density="compact"] .rowline { padding-block: 6px; }
+html[data-density="compact"] .big { font-size: clamp(24px, 7vw, 32px); }
