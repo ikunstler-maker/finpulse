@@ -1,4 +1,5 @@
 import { getDefaultInitialState } from './data/demo.js';
+import { migrateState, syncSalaryFields } from './data/migrate.js';
 import { ensurePresetIncomes } from './data/presets.js';
 import { sanitizeState } from './data/sanitize.js';
 
@@ -7,6 +8,14 @@ import { sanitizeState } from './data/sanitize.js';
  */
 export const STORAGE_KEY = 'finpulse_app_state_v3';
 
+/** Перевірка → перенесення формату → шаблони надходжень. Для localStorage і бекапів. */
+export function prepareState(raw) {
+    const clean = sanitizeState(raw);
+    if (!clean) return null;
+    migrateState(clean);
+    Object.values(clean.months).forEach(ensurePresetIncomes);
+    return clean;
+}
 
 export let state = loadState();
 
@@ -14,16 +23,13 @@ export function loadState() {
     try {
         const raw = localStorage.getItem(STORAGE_KEY);
         if (raw) {
-            const parsed = sanitizeState(JSON.parse(raw));
-            if (parsed) {
-                Object.keys(parsed.months).forEach(k => ensurePresetIncomes(parsed.months[k]));
-                return parsed;
-            }
+            const parsed = prepareState(JSON.parse(raw));
+            if (parsed) return parsed;
         }
     } catch (e) {
         console.error('Помилка завантаження стану:', e);
     }
-    return getDefaultInitialState();
+    return prepareState(getDefaultInitialState());
 }
 
 export function saveState() {
@@ -37,3 +43,18 @@ export function saveState() {
 export function setState(next) {
     state = next;
 }
+
+let listener = () => {};
+export function onStateChange(fn) {
+    listener = fn;
+}
+
+/** Змінює дані, синхронізує поля зарплати, зберігає й перемальовує сторінку. */
+export function update(fn) {
+    fn(state);
+    Object.values(state.months).forEach(syncSalaryFields);
+    saveState();
+    listener();
+}
+
+export const activeMonth = () => state.months[state.activeMonthKey];

@@ -1,107 +1,345 @@
+import { averageSalaryRate, carryOverBalance, DEFAULT_RATE, getPrevMonthKey, monthIncomeTotal, monthReceivedIncome, partRate, salaryTotal } from '../calc.js';
 import { INCOME_CATEGORIES } from '../data/categories.js';
-import { escapeHtml, formatCurrency } from '../utils.js';
+import { newId } from '../data/migrate.js';
+import { plural, t } from '../i18n/index.js';
+import { activeMonth, state, update } from '../state.js';
+import { currencyFields, readCurrency, wireCurrency } from './currency.js';
+import { dayMonth, esc, foreign, money, monthName, number } from './format.js';
+import { closeSheet, confirmSheet, openSheet, toast } from './sheet.js';
 
-/**
- * РЕНДЕР СЕКЦІЇ НАДХОДЖЕНЬ
- */
-export function toggleIncomesDetails() {
-    const body = document.getElementById('incomes-body');
-    const arrow = document.getElementById('incomes-toggle-arrow');
-    body.classList.toggle('hidden');
-    arrow.classList.toggle('rotate-180');
+/** Шаблон без суми — порожнє місце, а не надходження; у списку його не показуємо. */
+const visibleIncome = i => !(i.isPreset && !(i.amountUAH > 0));
+
+/* ---------- Зарплата частинами ---------- */
+
+function partRow(p, m) {
+    const rate = partRate(p);
+    return `
+        <div class="item salary-part">
+            <button class="check" role="checkbox" aria-checked="${!!p.received}" data-action="toggle-part" data-id="${p.id}"
+                aria-label="${esc(t(p.received ? 'salary.markExpected' : 'salary.markReceived', { amount: foreign(p.amount, p.currency) }))}"><span></span></button>
+            <button class="item-main" data-action="edit-part" data-id="${p.id}">
+                <span class="item-text">
+                    <span class="item-title num">${foreign(p.amount, p.currency)}</span>
+                    <span class="item-meta"><span class="num">${dayMonth(m.month, p.day)}</span>${rate ? `<span class="num">${t('salary.rateShort', { rate: number(rate, 4) })}</span>` : ''}${p.received ? '' : `<span class="chip bridge">${t('incomes.expected')}</span>`}</span>
+                </span>
+                <span class="amount"><strong class="num">+${money(p.uah)}</strong></span>
+            </button>
+        </div>`;
 }
 
-export function renderIncomesSection(curMonth, totalIncomeUAH, itemsIncomeTotalUAH) {
-    const countBadge = document.getElementById('incomes-count-badge');
-    const totalSummary = document.getElementById('incomes-total-summary');
-    const extraSummary = document.getElementById('incomes-extra-summary');
-    const chipsContainer = document.getElementById('incomes-chips-container');
-    const itemsList = document.getElementById('incomes-items-list');
-    const isLight = document.documentElement.classList.contains('light');
+function salaryCard(m) {
+    const parts = [...(m.salaryParts || [])].sort((a, b) => a.day - b.day);
+    const total = salaryTotal(m);
+    const avg = averageSalaryRate(m);
+    const meta = parts.length
+        ? [t('salary.partsCount', { n: parts.length, parts: plural(parts.length, t('salary.partsWord').split(',')) }), avg ? t('salary.avgRate', { rate: number(avg, 4) }) : ''].filter(Boolean).join(' · ')
+        : t('salary.noParts');
+    return `
+        <section class="section salary-section" aria-label="${t('salary.title')}">
+            <div class="section-head"><h2>${t('salary.title')}</h2><span class="meta num">${money(total)}</span></div>
+            <p class="group-hint">${meta} · ${t('salary.payday', { day: m.salaryDay })}</p>
+            <div class="list">
+                ${parts.map(p => partRow(p, m)).join('') || `<div class="empty">${t('salary.empty')}</div>`}
+                <button class="add-row" data-action="add-part">${t('salary.addPart')}</button>
+                <button class="add-row secondary" data-action="salary-day">${t('salary.changeDay')}</button>
+            </div>
+        </section>`;
+}
 
-    const activeItemsCount = (curMonth.incomes || []).filter(i => (i.amountUAH || 0) > 0).length;
-    countBadge.textContent = activeItemsCount > 0 ? `ЗП + ${activeItemsCount} активних` : 'ЗП + 4 статті (0 ₴)';
-    totalSummary.textContent = `${formatCurrency(totalIncomeUAH)} ₴`;
-    extraSummary.textContent = itemsIncomeTotalUAH > 0 ? `(додатково +${formatCurrency(itemsIncomeTotalUAH)} ₴)` : '';
+function findPart(id) {
+    return (activeMonth().salaryParts || []).find(p => p.id === id);
+}
 
-    // Чіпси структури доходу (ЗП + 4 обов'язкові статті)
-    const catSums = {};
-    (curMonth.incomes || []).forEach(inc => {
-        catSums[inc.category] = (catSums[inc.category] || 0) + (inc.amountUAH || 0);
+export function togglePart(id) {
+    update(() => {
+        const p = findPart(id);
+        if (p) p.received = !p.received;
     });
+}
 
-    let chipsHtml = `
-        <div class="p-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-mono">
-            <span class="block text-[8px] text-slate-500 dark:text-slate-400">💼 ЗП (Binance)</span>
-            <span class="font-bold">${formatCurrency(curMonth.incomeUAH)} ₴</span>
-        </div>
-        <div class="p-1.5 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-cyan-600 dark:text-cyan-400 font-mono">
-            <span class="block text-[8px] text-slate-500 dark:text-slate-400">🏦 Заощадження</span>
-            <span class="font-bold">${formatCurrency(catSums['savings'] || 0)} ₴</span>
-        </div>
-        <div class="p-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 font-mono">
-            <span class="block text-[8px] text-slate-500 dark:text-slate-400">⚡ Дод. заробіток</span>
-            <span class="font-bold">${formatCurrency(catSums['extra'] || 0)} ₴</span>
-        </div>
-        <div class="p-1.5 rounded-lg bg-purple-500/10 border border-purple-500/20 text-purple-600 dark:text-purple-400 font-mono">
-            <span class="block text-[8px] text-slate-500 dark:text-slate-400">🕊️ Благодійність</span>
-            <span class="font-bold">${formatCurrency(catSums['charity_in'] || 0)} ₴</span>
-        </div>
-        <div class="p-1.5 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 font-mono">
-            <span class="block text-[8px] text-slate-500 dark:text-slate-400">🤝 Повернення боргів</span>
-            <span class="font-bold">${formatCurrency(catSums['debt_return'] || 0)} ₴</span>
-        </div>
-    `;
+export function openPartSheet(id = null) {
+    const m = activeMonth();
+    const part = id ? findPart(id) : null;
+    const isNew = !part;
+    const last = [...(m.salaryParts || [])].reverse().find(p => p.currency !== 'UAH');
+    const p = part || { amount: '', currency: last?.currency || 'USDT', uah: '', day: m.salaryDay, received: true };
+    const rate = part ? partRate(part) || '' : (last ? Math.round(partRate(last) * 10000) / 10000 : m.rate || DEFAULT_RATE);
 
-    // Якщо є інші довільні категорії надходжень
-    Object.keys(catSums).forEach(catId => {
-        if (!['savings', 'extra', 'charity_in', 'debt_return'].includes(catId)) {
-            const catObj = INCOME_CATEGORIES.find(c => c.id === catId) || { icon: '💵', name: 'Надходження' };
-            chipsHtml += `
-                <div class="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 font-mono">
-                    <span class="block text-[8px] text-slate-500 dark:text-slate-400 truncate">${catObj.icon} ${catObj.name}</span>
-                    <span class="font-bold text-slate-800 dark:text-slate-200">${formatCurrency(catSums[catId])} ₴</span>
-                </div>
-            `;
+    const sheet = openSheet(`
+        <h3>${isNew ? t('salary.newPart') : t('salary.editPart')}</h3>
+        <p class="sheet-text">${t('salary.partHint')}</p>
+        <form id="part-form" novalidate>
+            ${currencyFields({ currency: p.currency, amount: p.amount, rate, uah: p.uah, currencies: ['USDT', 'USD', 'UAH'] })}
+            <div class="field">
+                <label for="f-day">${t('salary.partDay', { month: monthName(m.year, m.month) })}</label>
+                <input id="f-day" type="number" inputmode="numeric" min="1" max="31" value="${p.day}">
+            </div>
+            <div class="toggle"><span id="recv-label">${t('incomes.received')}</span><button type="button" class="switch" role="switch" id="f-received" aria-checked="${!!p.received}" aria-labelledby="recv-label"></button></div>
+            <p class="form-error" id="form-error" role="alert" hidden></p>
+            <div class="actions">
+                <button class="btn primary" type="submit">${isNew ? t('salary.addPartBtn') : t('common.save')}</button>
+                ${isNew ? '' : `<button class="btn danger" type="button" data-sheet="delete">${t('common.delete')}</button>`}
+                <button class="btn ghost" type="button" data-action="close-sheet">${t('common.cancel')}</button>
+            </div>
+        </form>`, { label: t('salary.title') });
+
+    wireCurrency(sheet);
+    sheet.addEventListener('click', ev => {
+        if (ev.target.closest('#f-received')) {
+            const sw = sheet.querySelector('#f-received');
+            sw.setAttribute('aria-checked', sw.getAttribute('aria-checked') !== 'true');
+        }
+        if (ev.target.closest('[data-sheet="delete"]')) {
+            confirmSheet({ title: t('salary.deleteTitle'), text: t('salary.deleteText', { amount: foreign(part.amount, part.currency) }), confirm: t('common.delete') })
+                .then(ok => {
+                    if (!ok) return;
+                    update(() => { m.salaryParts = m.salaryParts.filter(x => x.id !== part.id); });
+                    toast(t('toast.partDeleted'));
+                });
         }
     });
-
-    chipsContainer.innerHTML = chipsHtml;
-
-    // Рендер рядків надходжень
-    itemsList.innerHTML = (curMonth.incomes || []).map(inc => {
-        const cat = INCOME_CATEGORIES.find(c => c.id === inc.category) || { icon: '💵', name: 'Дохід' };
-        const isReceived = inc.isReceived !== false;
-        const hasAmount = (inc.amountUAH || 0) > 0;
-        const itemClass = isLight 
-            ? 'bg-white border-emerald-200 text-slate-800' 
-            : 'bg-darkcard border-emerald-500/30 text-slate-100';
-
-        return `
-            <div class="flex items-center gap-2 text-xs py-1.5 px-2 rounded-xl border ${itemClass} transition ${hasAmount ? '' : 'opacity-70'}">
-                <button onclick="toggleIncomeReceived('${inc.id}')" class="w-5 h-5 flex-shrink-0 rounded-md flex items-center justify-center border transition ${isReceived && hasAmount ? 'bg-emerald-500 border-emerald-500 text-slate-950 font-bold' : 'border-slate-400 dark:border-slate-600 bg-slate-100 dark:bg-slate-900 text-transparent'}" title="${isReceived ? 'Отримано' : 'Очікується'}">
-                    ${isReceived && hasAmount ? '✓' : ''}
-                </button>
-                <span class="w-6 text-center text-[10px] font-mono text-emerald-700 dark:text-emerald-300 bg-emerald-500/20 rounded py-0.5 font-bold cursor-pointer" onclick="openIncomeItemModal('${inc.id}')" title="Число надходження">${inc.day || 1}</span>
-                <span class="text-xs" title="${cat.name}">${cat.icon}</span>
-                <div class="flex-1 min-w-0" onclick="openIncomeItemModal('${inc.id}')" role="button">
-                    <div class="truncate font-medium text-xs ${hasAmount ? (isReceived ? '' : 'text-slate-400 italic') : 'text-slate-400'}">${escapeHtml(inc.title)}</div>
-                    <div class="text-[9px] text-slate-400">${cat.name}</div>
-                </div>
-                <div ondblclick="makeIncomeAmountEditable(event, '${inc.id}')" class="text-right flex-shrink-0 font-mono font-bold text-xs ${hasAmount ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400 dark:text-slate-500'} cursor-pointer hover:text-emerald-500 transition" title="Подвійний клік: змінити суму">
-                    +${formatCurrency(inc.amountUAH || 0)} ₴
-                </div>
-                <button onclick="openIncomeItemModal('${inc.id}')" class="p-1 rounded-md text-slate-400 hover:text-white transition text-xs" title="Редагувати або вказати суму">
-                    ✏️
-                </button>
-            </div>
-        `;
-    }).join('');
+    sheet.querySelector('#part-form').addEventListener('submit', ev => {
+        ev.preventDefault();
+        const amt = readCurrency(sheet);
+        const day = parseInt(sheet.querySelector('#f-day').value, 10);
+        const err = sheet.querySelector('#form-error');
+        const fail = msg => { err.textContent = msg; err.hidden = false; };
+        if (!(amt.amount > 0) || !(amt.uah > 0)) return fail(t('salary.errAmount'));
+        if (!(day >= 1 && day <= 31)) return fail(t('expense.errDay'));
+        const rec = { amount: amt.amount, currency: amt.currency, uah: amt.uah, day, received: sheet.querySelector('#f-received').getAttribute('aria-checked') === 'true' };
+        update(() => {
+            if (!Array.isArray(m.salaryParts)) m.salaryParts = [];
+            if (isNew) m.salaryParts.push({ id: newId('sal'), ...rec });
+            else Object.assign(part, rec);
+        });
+        closeSheet();
+        toast(t(isNew ? 'toast.partAdded' : 'toast.saved'));
+    });
 }
 
-export function toggleBridgeDetails() {
-    const list = document.getElementById('bridge-items-list');
-    const arrow = document.getElementById('bridge-toggle-arrow');
-    list.classList.toggle('hidden');
-    arrow.classList.toggle('rotate-180');
+export function openSalaryDaySheet() {
+    const m = activeMonth();
+    const sheet = openSheet(`
+        <h3>${t('salary.dayTitle')}</h3>
+        <p class="sheet-text">${t('salary.dayHint')}</p>
+        <form id="day-form" novalidate>
+            <div class="field">
+                <label for="f-salary-day">${t('salary.dayLabel', { month: monthName(m.year, m.month) })}</label>
+                <input id="f-salary-day" type="number" inputmode="numeric" min="1" max="28" value="${m.salaryDay}">
+            </div>
+            <p class="form-error" id="form-error" role="alert" hidden></p>
+            <div class="actions">
+                <button class="btn primary" type="submit">${t('common.save')}</button>
+                <button class="btn ghost" type="button" data-action="close-sheet">${t('common.cancel')}</button>
+            </div>
+        </form>`, { label: t('salary.dayTitle') });
+    sheet.querySelector('#day-form').addEventListener('submit', ev => {
+        ev.preventDefault();
+        const day = parseInt(sheet.querySelector('#f-salary-day').value, 10);
+        if (!(day >= 1 && day <= 28)) {
+            const err = sheet.querySelector('#form-error');
+            err.textContent = t('salary.errDay');
+            err.hidden = false;
+            return;
+        }
+        update(() => { m.salaryDay = day; });
+        closeSheet();
+        toast(t('toast.saved'));
+    });
+}
+
+/* ---------- Надходження ---------- */
+
+function incomeRow(i, m) {
+    const from = i.debtor ? `<span>${esc(t('incomes.from', { name: i.debtor }))}</span>` : '';
+    const received = i.isReceived !== false;
+    return `
+        <div class="item income-row">
+            <button class="check" role="checkbox" aria-checked="${received}" data-action="toggle-income" data-id="${i.id}"
+                aria-label="${esc(t(received ? 'incomes.markExpected' : 'incomes.markReceived', { title: i.title }))}"><span></span></button>
+            <button class="item-main" data-action="edit-income" data-id="${i.id}">
+                <span class="item-text">
+                    <span class="item-title">${esc(i.title)}</span>
+                    <span class="item-meta"><span class="num">${dayMonth(m.month, i.day || 1)}</span>${from}${received ? '' : `<span class="chip bridge">${t('incomes.expected')}</span>`}</span>
+                </span>
+                <span class="amount"><strong class="num">+${money(i.amountUAH)}</strong>${i.amountUSD > 0 ? `<span class="num">${foreign(i.amountUSD, i.currency || 'USD')}</span>` : ''}</span>
+            </button>
+        </div>`;
+}
+
+export function incomesView() {
+    const m = activeMonth();
+    const total = monthIncomeTotal(m);
+    const received = monthReceivedIncome(m);
+    const prev = state.months[getPrevMonthKey(state.activeMonthKey)];
+    const cats = INCOME_CATEGORIES.map(c => {
+        const items = (m.incomes || []).filter(i => i.category === c.id && visibleIncome(i)).sort((a, b) => (a.day || 1) - (b.day || 1));
+        const sum = items.reduce((s, i) => s + (i.amountUAH || 0), 0);
+        const carry = c.id === 'savings' && prev
+            ? `<button class="add-row secondary" data-action="take-savings">${t('incomes.takeSavings', { month: esc(prev.name) })}</button>`
+            : '';
+        return `
+            <section class="section income-cat" data-income-cat="${c.id}">
+                <div class="section-head"><h2>${esc(c.name)}</h2><span class="meta num">${money(sum)}</span></div>
+                <div class="list">
+                    ${items.map(i => incomeRow(i, m)).join('') || `<div class="empty">${t('incomes.emptyCat')}</div>`}
+                    <button class="add-row" data-action="add-income" data-category="${c.id}">${t('incomes.add')}</button>
+                    ${carry}
+                </div>
+            </section>`;
+    }).join('');
+    return `
+        <div class="rail">
+            <section class="summary" aria-label="${t('incomes.summary')}">
+                <div>
+                    <div class="label">${t('incomes.total')}</div>
+                    <div class="big num" id="incomes-total">${money0Safe(total)}</div>
+                </div>
+                <div class="rows">
+                    <div class="rowline"><span>${t('incomes.receivedTotal')}</span><span class="val num" id="incomes-received">${money(received)}</span></div>
+                    <div class="rowline"><span>${t('incomes.expectedTotal')}</span><span class="val num" id="incomes-expected">${money(Math.max(0, total - received))}</span></div>
+                </div>
+            </section>
+        </div>
+        <div class="main-col">
+            ${salaryCard(m)}
+            ${cats}
+        </div>`;
+}
+
+const money0Safe = n => money(n).replace(/,00 ₴$/, ' ₴');
+
+function findIncome(id) {
+    return (activeMonth().incomes || []).find(i => i.id === id);
+}
+
+export function toggleIncome(id) {
+    update(() => {
+        const i = findIncome(id);
+        if (i) i.isReceived = i.isReceived === false;
+    });
+}
+
+export function openIncomeSheet(id = null, category = 'extra') {
+    const m = activeMonth();
+    const income = id ? findIncome(id) : null;
+    const isNew = !income;
+    const i = income || { category, title: '', debtor: '', amountUAH: '', day: Math.min(new Date().getDate(), 28), isReceived: true };
+    const currency = i.amountUSD > 0 ? i.currency || 'USD' : 'UAH';
+    const rate = i.amountUSD > 0 ? Math.round(i.amountUAH / i.amountUSD * 10000) / 10000 : m.rate || DEFAULT_RATE;
+
+    const sheet = openSheet(`
+        <h3>${isNew ? t('incomes.new') : esc(i.title)}</h3>
+        <form id="income-form" novalidate>
+            <div class="field">
+                <label for="f-category">${t('incomes.category')}</label>
+                <select id="f-category">${INCOME_CATEGORIES.map(c => `<option value="${c.id}" ${c.id === i.category ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select>
+            </div>
+            <div class="field">
+                <label for="f-title">${t('incomes.titleLabel')}</label>
+                <input id="f-title" value="${esc(i.title)}" placeholder="${t('incomes.titlePlaceholder')}" autocomplete="off" maxlength="120">
+            </div>
+            <div class="field">
+                <label for="f-from">${t('incomes.fromLabel')}</label>
+                <input id="f-from" value="${esc(i.debtor || '')}" placeholder="${t('incomes.fromPlaceholder')}" autocomplete="off" maxlength="80">
+            </div>
+            ${currencyFields({ currency, amount: currency === 'UAH' ? i.amountUAH : i.amountUSD, rate, uah: i.amountUAH })}
+            <div class="field">
+                <label for="f-day">${t('incomes.day', { month: monthName(m.year, m.month) })}</label>
+                <input id="f-day" type="number" inputmode="numeric" min="1" max="31" value="${i.day || 1}">
+            </div>
+            <div class="toggle"><span id="recv-label">${t('incomes.received')}</span><button type="button" class="switch" role="switch" id="f-received" aria-checked="${i.isReceived !== false}" aria-labelledby="recv-label"></button></div>
+            <p class="form-error" id="form-error" role="alert" hidden></p>
+            <div class="actions">
+                <button class="btn primary" type="submit">${isNew ? t('incomes.addBtn') : t('common.save')}</button>
+                ${isNew ? '' : `<button class="btn danger" type="button" data-sheet="delete">${t('common.delete')}</button>`}
+                <button class="btn ghost" type="button" data-action="close-sheet">${t('common.cancel')}</button>
+            </div>
+        </form>`, { label: isNew ? t('incomes.new') : i.title });
+
+    wireCurrency(sheet);
+    sheet.addEventListener('click', ev => {
+        if (ev.target.closest('#f-received')) {
+            const sw = sheet.querySelector('#f-received');
+            sw.setAttribute('aria-checked', sw.getAttribute('aria-checked') !== 'true');
+        }
+        if (ev.target.closest('[data-sheet="delete"]')) {
+            confirmSheet({ title: t('incomes.deleteTitle'), text: t('incomes.deleteText', { title: esc(income.title) }), confirm: t('common.delete') })
+                .then(ok => {
+                    if (!ok) return;
+                    update(() => {
+                        if (income.isPreset) {
+                            income.amountUAH = 0;
+                            income.isReceived = false;
+                            delete income.amountUSD;
+                            delete income.currency;
+                        } else {
+                            m.incomes = m.incomes.filter(x => x.id !== income.id);
+                        }
+                    });
+                    toast(t('toast.incomeDeleted'));
+                });
+        }
+    });
+    sheet.querySelector('#income-form').addEventListener('submit', ev => {
+        ev.preventDefault();
+        const amt = readCurrency(sheet);
+        const day = parseInt(sheet.querySelector('#f-day').value, 10);
+        const cat = sheet.querySelector('#f-category').value;
+        const err = sheet.querySelector('#form-error');
+        const fail = msg => { err.textContent = msg; err.hidden = false; };
+        if (!(amt.uah > 0)) return fail(t('expense.errAmount'));
+        if (!(day >= 1 && day <= 31)) return fail(t('expense.errDay'));
+        const title = sheet.querySelector('#f-title').value.trim() || INCOME_CATEGORIES.find(c => c.id === cat).name;
+        const rec = {
+            category: cat,
+            title,
+            debtor: sheet.querySelector('#f-from').value.trim(),
+            amountUAH: amt.uah,
+            day,
+            isReceived: sheet.querySelector('#f-received').getAttribute('aria-checked') === 'true',
+        };
+        update(() => {
+            const target = isNew ? { id: newId('inc'), isPreset: false } : income;
+            Object.assign(target, rec);
+            if (amt.currency === 'UAH') {
+                delete target.amountUSD;
+                delete target.currency;
+            } else {
+                target.amountUSD = amt.amount;
+                target.currency = amt.currency;
+            }
+            if (isNew) m.incomes.push(target);
+            syncLegacyIncomeFields(m);
+        });
+        closeSheet();
+        toast(t(isNew ? 'toast.incomeAdded' : 'toast.saved'));
+    });
+}
+
+/** Дзеркальні поля для старих бекапів (у сумах не використовуються). */
+function syncLegacyIncomeFields(m) {
+    const sumOf = cat => m.incomes.filter(x => x.category === cat).reduce((s, x) => s + (x.amountUAH || 0), 0);
+    m.savingsUAH = sumOf('savings');
+    m.extraIncomeUAH = sumOf('extra');
+}
+
+export function takeSavingsFromPrevious() {
+    const m = activeMonth();
+    const prev = state.months[getPrevMonthKey(state.activeMonthKey)];
+    if (!prev) return;
+    const amount = carryOverBalance(prev, m.expenses, m.salaryDay);
+    update(() => {
+        let target = m.incomes.find(i => i.category === 'savings' && i.isPreset) || m.incomes.find(i => i.category === 'savings');
+        if (!target) {
+            target = { id: newId('inc'), category: 'savings', title: '', day: 1, isPreset: false };
+            m.incomes.push(target);
+        }
+        target.title = t('incomes.savingsFrom', { month: prev.name });
+        target.amountUAH = amount;
+        target.isReceived = amount > 0;
+        syncLegacyIncomeFields(m);
+    });
+    toast(t('toast.savingsTaken', { amount: money(amount), month: prev.name }));
 }

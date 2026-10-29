@@ -6,6 +6,7 @@ import { ensurePresetIncomes } from './presets.js';
 export function getDefaultInitialState() {
     // Fictional demo data: no real people, amounts or services of the owner.
     const state = {
+        version: 4,
         activeMonthKey: '2026-10',
         appMode: 'view', // 'view' або 'edit'
         months: {
@@ -17,6 +18,10 @@ export function getDefaultInitialState() {
                 incomeUAH: 49800.00,
                 incomeUSD: 1200.00,
                 incomeUSDT: 1200.00,
+                salaryParts: [
+                    { id: 'sal_demo_1', amount: 700, currency: 'USDT', uah: 28980.00, day: 8, received: true },
+                    { id: 'sal_demo_2', amount: 500, currency: 'USDT', uah: 20820.00, day: 15, received: true },
+                ],
                 savingsUAH: 3000.00,
                 extraIncomeUAH: 0,
                 incomes: [
@@ -51,6 +56,9 @@ export function getDefaultInitialState() {
                 incomeUAH: 49800.00,
                 incomeUSD: 1200.00,
                 incomeUSDT: 1200.00,
+                salaryParts: [
+                    { id: 'sal_demo_3', amount: 1200, currency: 'USDT', uah: 49800.00, day: 8, received: false },
+                ],
                 savingsUAH: 0,
                 extraIncomeUAH: 0,
                 incomes: [],

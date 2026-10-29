@@ -43,14 +43,57 @@ export function incomeItemsTotal(month, { receivedOnly = false } = {}) {
     return sumUAH(items);
 }
 
-/** Усі доходи місяця: ЗП + статті надходжень. */
-export function monthIncomeTotal(month) {
-    return (month.incomeUAH || 0) + incomeItemsTotal(month);
+/**
+ * Зарплата місяця. З версії даних 4 вона складається з частин (виводів):
+ * кожна має суму у своїй валюті та фактичну суму в гривнях (`uah`).
+ * Без частин (старі дані) — поле `incomeUAH`, яке вважається отриманим.
+ */
+export function salaryTotal(month, { receivedOnly = false } = {}) {
+    if (!Array.isArray(month.salaryParts)) return month.incomeUAH || 0;
+    return month.salaryParts
+        .filter(p => !receivedOnly || p.received)
+        .reduce((s, p) => s + (p.uah || 0), 0);
 }
 
-/** Уже отримані доходи: ЗП + статті, позначені як отримані. */
+/** Сума частин зарплати в іноземній валюті (для звітів у $/USDT). */
+export function salaryForeignTotal(month) {
+    if (!Array.isArray(month.salaryParts)) {
+        if (month.incomeUSDT !== undefined) return month.incomeUSDT;
+        if (month.incomeUSD !== undefined) return month.incomeUSD;
+        return month.rate ? (month.incomeUAH || 0) / month.rate : 0;
+    }
+    return month.salaryParts.reduce((s, p) => s + (p.currency === 'UAH' ? (month.rate ? p.uah / month.rate : 0) : p.amount || 0), 0);
+}
+
+/** Фактичний курс частини: скільки гривень отримано за 1 одиницю валюти. */
+export function partRate(part) {
+    return part.currency !== 'UAH' && part.amount > 0 ? part.uah / part.amount : 0;
+}
+
+/** Середній курс усіх валютних частин зарплати (зважений за сумою). */
+export function averageSalaryRate(month) {
+    const parts = (month.salaryParts || []).filter(p => p.currency !== 'UAH' && p.amount > 0);
+    const amount = parts.reduce((s, p) => s + p.amount, 0);
+    return amount > 0 ? parts.reduce((s, p) => s + p.uah, 0) / amount : 0;
+}
+
+/** Гривні для суми в валюті за курсом, з округленням до копійок. */
+export function toUAH(amount, currency, rate) {
+    return currency === 'UAH' ? round2(amount) : round2(amount * rate);
+}
+
+export function round2(n) {
+    return Math.round((Number(n) || 0) * 100) / 100;
+}
+
+/** Усі доходи місяця: ЗП + статті надходжень. */
+export function monthIncomeTotal(month) {
+    return salaryTotal(month) + incomeItemsTotal(month);
+}
+
+/** Уже отримані доходи: отримані частини ЗП + статті, позначені як отримані. */
 export function monthReceivedIncome(month) {
-    return (month.incomeUAH || 0) + incomeItemsTotal(month, { receivedOnly: true });
+    return salaryTotal(month, { receivedOnly: true }) + incomeItemsTotal(month, { receivedOnly: true });
 }
 
 /** Витрати наступного місяця, які треба сплатити до його ЗП («місток»). */
@@ -155,12 +198,6 @@ export function reconcile(month, nextMonth, actualUAH) {
     };
 }
 
-function salaryUSD(m) {
-    if (m.incomeUSDT !== undefined) return m.incomeUSDT;
-    if (m.incomeUSD !== undefined) return m.incomeUSD;
-    return m.rate ? m.incomeUAH / m.rate : 0;
-}
-
 /**
  * Дані для звітів.
  * period: 'custom' (from/to — рядки YYYY-MM-DD), 'current', '3m', '6m', 'year', 'all'.
@@ -179,10 +216,20 @@ export function collectAnalytics(state, { period, from, to }) {
             const m = state.months[k];
             if (!m) return;
 
-            const salD = new Date(m.year, m.month - 1, m.salaryDay || 8);
-            if (salD >= fromD && salD <= toD) {
-                totalIncome += m.incomeUAH || 0;
-                totalIncomeUSD += salaryUSD(m);
+            if (Array.isArray(m.salaryParts)) {
+                m.salaryParts.forEach(p => {
+                    const partD = new Date(m.year, m.month - 1, p.day || m.salaryDay || 8);
+                    if (partD >= fromD && partD <= toD) {
+                        totalIncome += p.uah || 0;
+                        totalIncomeUSD += p.currency === 'UAH' ? (m.rate ? p.uah / m.rate : 0) : p.amount || 0;
+                    }
+                });
+            } else {
+                const salD = new Date(m.year, m.month - 1, m.salaryDay || 8);
+                if (salD >= fromD && salD <= toD) {
+                    totalIncome += m.incomeUAH || 0;
+                    totalIncomeUSD += salaryForeignTotal(m);
+                }
             }
             (m.incomes || []).forEach(inc => {
                 const incD = new Date(m.year, m.month - 1, inc.day || 1);
@@ -218,7 +265,7 @@ export function collectAnalytics(state, { period, from, to }) {
 
     selectedMonths.filter(Boolean).forEach(m => {
         totalIncome += monthIncomeTotal(m);
-        totalIncomeUSD += salaryUSD(m);
+        totalIncomeUSD += salaryForeignTotal(m);
         (m.expenses || []).forEach(e => {
             expenses.push({ ...e, monthKey: `${m.year}-${m.month}`, monthRate: m.rate });
         });
