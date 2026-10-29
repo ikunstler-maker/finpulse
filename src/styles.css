@@ -1,0 +1,125 @@
+@tailwind base;
+@tailwind components;
+
+* {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+}
+/* Анімація для прострочених чекбоксів */
+@keyframes pulse-gold {
+    0%, 100% {
+        box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.7);
+    }
+    50% {
+        box-shadow: 0 0 0 5px rgba(251, 191, 36, 0);
+    }
+}
+.pulse-overdue {
+    animation: pulse-gold 2s infinite;
+}
+/* iOS збільшує сторінку при фокусі на полі з шрифтом < 16px */
+@media (max-width: 640px) {
+    input, select, textarea {
+        font-size: 16px !important;
+    }
+}
+/* Кастомний скролбар */
+::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+}
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+::-webkit-scrollbar-thumb {
+    background: #334155;
+    border-radius: 9999px;
+}
+/* Стилі для світлої теми */
+html.light {
+    background-color: #f8fafc;
+    color: #0f172a;
+}
+html.light body {
+    background-color: #f8fafc !important;
+    color: #0f172a !important;
+}
+html.light .bg-darkbg {
+    background-color: #f8fafc !important;
+}
+html.light .bg-darkcard {
+    background-color: #ffffff !important;
+    border-color: #e2e8f0 !important;
+    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.05);
+}
+html.light .border-darkborder {
+    border-color: #e2e8f0 !important;
+}
+html.light #kpi-hero-section {
+    background: #ffffff !important;
+    background-image: none !important;
+    border-color: #e2e8f0 !important;
+    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.05);
+}
+html.light #kpi-in-hand-uah {
+    color: #0f172a !important;
+}
+html.light #category-summary-widget {
+    background: #ffffff !important;
+    background-image: none !important;
+    border-color: #e2e8f0 !important;
+    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.05);
+}
+html.light .cat-summary-box {
+    background-color: #f8fafc !important;
+    border-color: #e2e8f0 !important;
+}
+html.light .expense-row {
+    background-color: #ffffff !important;
+    border-color: #e2e8f0 !important;
+    color: #1e293b !important;
+}
+html.light .expense-row:hover {
+    background-color: #f8fafc !important;
+}
+html.light #bridge-card {
+    background-color: #fffbeb !important;
+    border-color: #fde68a !important;
+    color: #92400e !important;
+}
+html.light #bridge-items-list > div {
+    background-color: #fef3c7 !important;
+    border-color: #fde68a !important;
+    color: #92400e !important;
+}
+html.light #overdue-alert-banner {
+    background-color: #fffbeb !important;
+    border-color: #fde68a !important;
+    color: #92400e !important;
+}
+html.light #incomes-section {
+    background-color: #f0fdf4 !important;
+    border-color: #bbf7d0 !important;
+    color: #14532d !important;
+}
+html.light #incomes-items-list > div {
+    background-color: #ffffff !important;
+    border-color: #dcfce7 !important;
+    color: #166534 !important;
+}
+html.light #income-item-modal > div {
+    background-color: #ffffff !important;
+    border-color: #e2e8f0 !important;
+    color: #0f172a !important;
+}
+html.light #custom-date-range-panel {
+    background-color: #ffffff !important;
+    border-color: #e2e8f0 !important;
+}
+html.light input, html.light select {
+    background-color: #ffffff !important;
+    border-color: #cbd5e1 !important;
+    color: #0f172a !important;
+}
+
+@tailwind utilities;

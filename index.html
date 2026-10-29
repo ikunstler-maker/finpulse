@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html lang="uk" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FinPulse - Трекер бюджету за ЗП-циклом</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap">
+    <script type="module" src="/src/main.js"></script>
+</head>
+<body class="bg-slate-100 dark:bg-darkbg text-slate-800 dark:text-slate-100 min-h-screen font-sans pb-24 transition-colors duration-200">
+
+    <!-- ФІКСОВАНА ВЕРХНЯ ШАПКА -->
+    <header class="sticky top-0 z-40 bg-white/90 dark:bg-darkbg/90 backdrop-blur-md border-b border-slate-200 dark:border-darkborder shadow-sm">
+        <div class="max-w-md mx-auto px-4 py-2.5 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <div class="w-8 h-8 rounded-xl bg-emerald-500 text-slate-950 flex items-center justify-center font-black text-sm shadow-md shadow-emerald-500/20">
+                    FP
+                </div>
+                <div>
+                    <div class="flex items-center gap-1.5">
+                        <span class="text-sm font-black tracking-tight text-slate-900 dark:text-white">FinPulse</span>
+                        <span class="px-1.5 py-0.2 rounded-full text-[9px] font-semibold bg-slate-500/10 text-slate-600 dark:text-slate-300 border border-slate-500/30 flex items-center gap-0.5" title="Дані зберігаються лише в цьому браузері й поки не шифруються. Робіть резервні копії.">
+                            💾 Локально
+                        </span>
+                    </div>
+                    <div class="text-[9px] text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                        <span>🕒 Сьогодні:</span>
+                        <span id="header-today-date" class="font-bold text-slate-700 dark:text-slate-300">23 жовтня 2026</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-1">
+                <!-- Калькулятор звірки балансу -->
+                <button onclick="openReconciliationModal()" class="w-8 h-8 rounded-xl bg-slate-100 dark:bg-darkcard border border-slate-200 dark:border-darkborder flex items-center justify-center text-xs text-amber-500 hover:bg-slate-200 dark:hover:bg-slate-800 transition" title="Калькулятор звірки залишку та забутих витрат">
+                    🧮
+                </button>
+                <!-- Перемикач теми -->
+                <button onclick="toggleTheme()" class="w-8 h-8 rounded-xl bg-slate-100 dark:bg-darkcard border border-slate-200 dark:border-darkborder flex items-center justify-center text-xs text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 transition" title="Змінити тему">
+                    <span id="theme-icon">🌙</span>
+                </button>
+                <!-- Резервна копія (Backup / Export) -->
+                <button onclick="openBackupModal()" class="w-8 h-8 rounded-xl bg-slate-100 dark:bg-darkcard border border-slate-200 dark:border-darkborder flex items-center justify-center text-xs text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 transition" title="Резервна копія">
+                    ☁️
+                </button>
+                <!-- Налаштування ЗП -->
+                <button onclick="openSalarySettingsModal()" class="w-8 h-8 rounded-xl bg-slate-100 dark:bg-darkcard border border-slate-200 dark:border-slate-800 flex items-center justify-center text-xs text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 transition" title="Налаштування ЗП та курсу">
+                    ⚙️
+                </button>
+            </div>
+        </div>
+
+        <!-- ГОЛОВНІ ВКЛАДКИ: БЮДЖЕТ / ДОХОДИ / АНАЛІТИКА -->
+        <div class="max-w-md mx-auto px-3.5 pb-2 pt-0.5 grid grid-cols-3 gap-1.5">
+            <button id="main-tab-budget-btn" onclick="switchMainTab('budget')" class="py-1.5 px-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 bg-emerald-500 text-slate-950 shadow-sm truncate">
+                <span>📋 Бюджет</span>
+            </button>
+            <button id="main-tab-incomes-btn" onclick="switchMainTab('incomes')" class="py-1.5 px-2 rounded-xl text-xs font-semibold transition flex items-center justify-center gap-1 bg-slate-100 dark:bg-darkcard text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-darkborder hover:text-white truncate">
+                <span>💰 Доходи</span>
+            </button>
+            <button id="main-tab-analytics-btn" onclick="switchMainTab('analytics')" class="py-1.5 px-2 rounded-xl text-xs font-semibold transition flex items-center justify-center gap-1 bg-slate-100 dark:bg-darkcard text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-darkborder hover:text-white truncate">
+                <span>📊 Звіти</span>
+            </button>
+        </div>
+    </header>
+
+    <main class="max-w-md mx-auto px-3.5 pt-3 space-y-3.5">
+
+        <!-- СЕКЦІЯ 1: БЮДЖЕТ ЦИКЛУ -->
+        <div id="tab-budget-content" class="space-y-3.5">
+
+            <!-- ПЕРЕМИКАЧ МІСЯЦІВ ТА РЕЖИМІВ -->
+            <div class="flex items-center justify-between gap-2">
+                <!-- Селектор місяця -->
+                <div class="flex items-center bg-white dark:bg-darkcard border border-slate-200 dark:border-darkborder rounded-xl p-1 shadow-sm flex-1">
+                    <button onclick="prevMonth()" class="w-7 h-7 flex items-center justify-center text-slate-400 hover:text-white rounded-lg transition text-xs font-bold">
+                        ◀
+                    </button>
+                    <div class="flex-1 text-center font-bold text-xs text-slate-800 dark:text-slate-200 flex items-center justify-center gap-1 cursor-pointer" onclick="toggleMonthDropdown()">
+                        <span id="current-month-label">Жовтень 2026</span>
+                        <span class="text-[10px] text-slate-400">▼</span>
+                    </div>
+                    <button onclick="nextMonth()" class="w-7 h-7 flex items-center justify-center text-slate-400 hover:text-white rounded-lg transition text-xs font-bold">
+                        ▶
+                    </button>
+                </div>
+
+                <!-- Випадаючий список усіх місяців (прихований) -->
+                <div id="months-dropdown" class="hidden absolute top-28 left-4 right-4 z-50 bg-white dark:bg-darkcard border border-slate-200 dark:border-darkborder rounded-2xl shadow-2xl p-2 space-y-1 max-h-60 overflow-y-auto">
+                    <!-- Заповнюється скриптом -->
+                </div>
+
+                <!-- Режими: Огляд / Керування -->
+                <div class="flex items-center bg-slate-200 dark:bg-slate-800/80 p-0.5 rounded-xl border border-slate-300 dark:border-slate-700 text-xs font-medium">
+                    <button id="mode-view-btn" onclick="setAppMode('view')" class="px-2.5 py-1.5 rounded-lg text-slate-600 dark:text-slate-300 transition flex items-center gap-1 text-[11px]">
+                        <span>👁️ Огляд</span>
+                    </button>
+                    <button id="mode-edit-btn" onclick="setAppMode('edit')" class="px-2.5 py-1.5 rounded-lg bg-emerald-500 text-slate-950 font-bold transition flex items-center gap-1 text-[11px] shadow-sm">
+                        <span>✏️ Керування</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- КАРТКА ФІНАНСОВОГО ПУЛЬСУ (KPI ДАШБОРД) -->
+            <section id="kpi-hero-section" class="rounded-2xl p-4 bg-white dark:bg-gradient-to-br dark:from-slate-900 dark:via-darkcard dark:to-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm dark:shadow-lg relative overflow-hidden transition-all">
+                <!-- Дохід у USDT (Binance) та UAH -->
+                <div class="flex items-center justify-between text-xs mb-2 pb-2 border-b border-slate-200 dark:border-slate-800/80">
+                    <div class="flex items-center gap-1.5 cursor-pointer group" onclick="openSalarySettingsModal()" title="Натисніть, щоб скоригувати ЗП, заощадження чи курс виводу">
+                        <span class="w-5 h-5 rounded-md bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 flex items-center justify-center text-[10px] font-bold">💰</span>
+                        <span class="text-[11px] font-medium text-slate-700 dark:text-slate-300 group-hover:text-emerald-500 dark:group-hover:text-emerald-400 transition flex items-center gap-1">
+                            Всі доходи циклу (ЗП на <span id="kpi-salary-day" class="font-bold text-slate-900 dark:text-white">8</span>-е)
+                            <span class="text-[10px] text-slate-400">✏️</span>
+                        </span>
+                    </div>
+                    <div onclick="openSalarySettingsModal()" class="text-right cursor-pointer group" title="Редагувати доходи та ЗП">
+                        <div class="text-xs font-bold text-emerald-600 dark:text-emerald-400 group-hover:underline" id="kpi-income-display">72,040.96 ₴</div>
+                        <div class="text-[10px] text-slate-500 dark:text-slate-400 font-mono" id="kpi-income-usdt-display">1,600.00 USDT</div>
+                    </div>
+                </div>
+
+                <!-- ГОЛОВНЕ ЧИСЛО: ЗАРАЗ НА РУКАХ -->
+                <div class="my-2">
+                    <div class="text-[10px] uppercase font-bold tracking-wider text-emerald-600 dark:text-emerald-400">Зараз на руках (факт)</div>
+                    <div class="flex items-baseline gap-2 mt-0.5">
+                        <span class="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight" id="kpi-in-hand-uah">0.00 ₴</span>
+                        <span class="text-xs font-medium text-emerald-600 dark:text-emerald-300/80" id="kpi-in-hand-usd">₮0.00</span>
+                    </div>
+                    <p class="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">Враховуючи отримані доходи та оплачені витрати</p>
+                </div>
+
+                <!-- ПРОГРЕС БАР ВИТРАТ -->
+                <div class="mt-3">
+                    <div class="flex justify-between text-[10px] text-slate-500 dark:text-slate-400 mb-1">
+                        <span>Витрачено: <b id="progress-spent-text" class="text-slate-800 dark:text-slate-200">0%</b></span>
+                        <span>План сплати: <b id="progress-total-text" class="text-slate-800 dark:text-slate-200">0 ₴</b></span>
+                    </div>
+                    <div class="w-full h-2 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden flex">
+                        <div id="progress-bar-paid" class="h-full bg-emerald-500 transition-all duration-300" style="width: 0%"></div>
+                        <div id="progress-bar-pending" class="h-full bg-amber-500/40 transition-all duration-300" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <!-- СУБ-ПОКАЗНИКИ -->
+                <div class="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-slate-200 dark:border-slate-800/80">
+                    <div class="bg-slate-50 dark:bg-slate-900/60 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800">
+                        <div class="text-[10px] text-amber-600 dark:text-amber-400 font-semibold flex items-center gap-1">
+                            <span>⏳ До сплати</span>
+                        </div>
+                        <div class="text-sm font-bold text-slate-900 dark:text-slate-100 mt-0.5" id="kpi-remaining-to-pay-uah">0 ₴</div>
+                        <div class="text-[9px] text-slate-500 dark:text-slate-400">поточні + місток до ЗП</div>
+                    </div>
+
+                    <div class="bg-slate-50 dark:bg-slate-900/60 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800">
+                        <div class="text-[10px] text-teal-600 dark:text-teal-400 font-semibold flex items-center gap-1">
+                            <span>🎯 Вільний залишок</span>
+                        </div>
+                        <div class="text-sm font-bold text-emerald-600 dark:text-emerald-400 mt-0.5" id="kpi-free-balance-uah">0 ₴</div>
+                        <div class="text-[9px] text-slate-500 dark:text-slate-400" id="kpi-free-balance-usd">₮0.00 у кінці циклу</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- БЛОК-СПОВІЩЕННЯ: ПРОСТРОЧЕНІ ЧЕКБОКСИ -->
+            <section id="overdue-alert-banner" class="rounded-2xl p-3 bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/30 text-slate-800 dark:text-amber-200 hidden transition-all">
+                <div class="flex items-center justify-between gap-2.5">
+                    <div class="flex items-center gap-2.5 min-w-0">
+                        <div class="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center text-sm font-bold flex-shrink-0">
+                            ⚠️
+                        </div>
+                        <div class="min-w-0">
+                            <div class="flex items-center gap-1.5 flex-wrap">
+                                <span class="text-xs font-bold text-amber-700 dark:text-amber-400">Прострочені платежі</span>
+                                <span id="overdue-count-badge" class="px-1.5 py-0.5 rounded-md bg-amber-500/20 text-amber-800 dark:text-amber-300 text-[10px] font-mono font-bold">0 очікують</span>
+                            </div>
+                            <div id="overdue-subtext" class="text-[10px] text-slate-500 dark:text-amber-200/80 truncate">Планова дата платежу вже минула</div>
+                        </div>
+                    </div>
+                    <button onclick="filterByOverdueOnly()" class="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 active:scale-95 text-slate-950 font-bold text-[11px] transition whitespace-nowrap shadow-sm flex items-center gap-1 flex-shrink-0">
+                        <span>Показати</span>
+                        <span>➔</span>
+                    </button>
+                </div>
+            </section>
+
+            <!-- ПАНЕЛЬ ФІЛЬТРІВ ТА СТАТУСІВ -->
+            <div class="space-y-2">
+                <div class="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs select-none">
+                    <button onclick="setStatusFilter('all')" id="filter-btn-all" class="filter-status-btn px-2.5 py-1 rounded-xl font-bold bg-emerald-500 text-slate-950 transition">
+                        Всі (<span id="count-all">0</span>)
+                    </button>
+                    <button onclick="setStatusFilter('pending')" id="filter-btn-pending" class="filter-status-btn px-2.5 py-1 rounded-xl bg-slate-200 dark:bg-darkcard text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-darkborder transition">
+                        Очікують (<span id="count-pending">0</span>)
+                    </button>
+                    <button onclick="setStatusFilter('overdue')" id="filter-btn-overdue" class="filter-status-btn px-2.5 py-1 rounded-xl bg-slate-200 dark:bg-darkcard text-amber-600 dark:text-amber-400 border border-slate-300 dark:border-darkborder transition">
+                        ⚠️ Минулі (<span id="count-overdue">0</span>)
+                    </button>
+                    <button onclick="setStatusFilter('paid')" id="filter-btn-paid" class="filter-status-btn px-2.5 py-1 rounded-xl bg-slate-200 dark:bg-darkcard text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-darkborder transition">
+                        Сплачені (<span id="count-paid">0</span>)
+                    </button>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <select id="category-filter" onchange="onCategoryFilterChange()" class="w-full px-3 py-1.5 bg-white dark:bg-darkcard border border-slate-300 dark:border-darkborder rounded-xl text-xs text-slate-700 dark:text-slate-200 outline-none">
+                        <option value="all">Усі категорії</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- ВІДЖЕТ АНАЛІТИКИ ОБРАНОЇ КАТЕГОРІЇ -->
+            <section id="category-summary-widget" class="rounded-2xl p-3 bg-white dark:bg-darkcard border border-slate-200 dark:border-darkborder space-y-2 transition-all">
+                <div class="flex items-center justify-between text-xs">
+                    <div class="flex items-center gap-1.5 font-bold text-slate-800 dark:text-slate-200">
+                        <span id="cat-summary-icon">📊</span>
+                        <span id="cat-summary-title">Усі категорії місяця</span>
+                    </div>
+                    <span id="cat-summary-pct" class="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-500/10 px-1.5 py-0.5 rounded-md">
+                        0% сплачено
+                    </span>
+                </div>
+
+                <div class="grid grid-cols-3 gap-1.5 text-center">
+                    <div class="cat-summary-box p-1.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                        <span class="block text-[8px] text-slate-500 dark:text-slate-400">План категорії</span>
+                        <span class="font-bold text-xs text-slate-800 dark:text-slate-200 font-mono" id="cat-summary-total">0 ₴</span>
+                    </div>
+                    <div class="cat-summary-box p-1.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                        <span class="block text-[8px] text-slate-500 dark:text-slate-400">Вже витрачено</span>
+                        <span class="font-bold text-xs text-emerald-600 dark:text-emerald-400 font-mono" id="cat-summary-spent">0 ₴</span>
+                    </div>
+                    <div class="cat-summary-box p-1.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                        <span class="block text-[8px] text-slate-500 dark:text-slate-400">Ще належить</span>
+                        <span class="font-bold text-xs text-amber-600 dark:text-amber-400 font-mono" id="cat-summary-remaining">0 ₴</span>
+                    </div>
+                </div>
+
+                <div class="w-full h-1.5 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
+                    <div id="cat-summary-progress" class="h-full bg-emerald-500 transition-all duration-300" style="width: 0%"></div>
+                </div>
+            </section>
+
+            <!-- КНОПКИ ДІЙ У РЕЖИМІ КЕРУВАННЯ -->
+            <div id="edit-actions-panel" class="flex items-center gap-2">
+                <button onclick="openExpenseModal()" class="flex-1 py-2 px-3 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition shadow-sm">
+                    <span>＋ Додати витрату</span>
+                </button>
+                <button onclick="cloneMonthToNext()" class="py-2 px-3 bg-slate-200 dark:bg-darkcard hover:bg-slate-300 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 font-semibold text-xs rounded-xl flex items-center justify-center gap-1.5 transition border border-slate-300 dark:border-darkborder shadow-sm" title="Скопіювати регулярні витрати у наступний місяць">
+                    <span>📋 Копіювати в наступний</span>
+                </button>
+            </div>
+
+            <!-- СПИСОК ВИТРАТ ПО СЕКЦІЯХ -->
+            <div id="expenses-container" class="space-y-4 pt-1">
+                <!-- Заповнюється скриптом renderExpenses() -->
+            </div>
+
+            <!-- ЗАРПЛАТНИЙ МІСТОК ДО ЗП НАСТУПНОГО МІСЯЦЯ (В САМОМУ НИЗУ, РОЗГОРНУТО ТА ВИДІЛЕНО) -->
+            <div class="pt-2 border-t-2 border-dashed border-amber-500/30 mt-6">
+                <section id="bridge-card" class="rounded-2xl p-3.5 bg-amber-500/10 border-2 border-amber-500/30 text-amber-500 dark:text-amber-400 shadow-sm space-y-2.5 transition-all">
+                    <div class="flex items-center justify-between cursor-pointer" onclick="toggleBridgeDetails()">
+                        <div class="flex items-center gap-2.5">
+                            <span class="text-xl flex-shrink-0">🌉</span>
+                            <div>
+                                <div class="text-xs font-bold flex items-center gap-1.5 flex-wrap text-slate-900 dark:text-amber-300">
+                                    <span>Витрати до ЗП наступного місяця</span>
+                                    <span class="px-1.5 py-0.5 rounded-md bg-amber-500/20 text-amber-700 dark:text-amber-300 text-[10px] font-mono font-bold" id="bridge-days-range">1-7 число</span>
+                                </div>
+                                <div class="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
+                                    Платежі до дня нової ЗП наступного періоду
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2 flex-shrink-0">
+                            <div class="text-right">
+                                <span class="text-[9px] uppercase font-bold text-slate-500 dark:text-slate-400 block">Зарезервовано:</span>
+                                <span class="font-black text-xs sm:text-sm text-amber-600 dark:text-amber-400 font-mono" id="bridge-total-display">0.00 ₴</span>
+                            </div>
+                            <span id="bridge-toggle-arrow" class="text-xs text-amber-500 transition-transform">▲</span>
+                        </div>
+                    </div>
+                    <p class="text-[10px] text-slate-500 dark:text-amber-200/80 leading-relaxed pt-1.5 border-t border-amber-500/20">
+                        💡 Ці витрати припадають на початок наступного місяця <strong>до нарахування нової заробітної плати</strong>. Додаток автоматично резервує під них кошти з поточного балансу.
+                    </p>
+                    <div id="bridge-items-list" class="space-y-1.5 pt-1">
+                        <!-- Заповнюється скриптом -->
+                    </div>
+                </section>
+            </div>
+
+        </div>
+
+        <!-- СЕКЦІЯ: ДОХОДИ ТА НАДХОДЖЕННЯ ЦИКЛУ (ОКРЕМА ВКЛАДКА) -->
+        <div id="tab-incomes-content" class="space-y-3.5 hidden">
+
+            <!-- КАРТКА ПІДСУМКУ ДОХОДІВ ЦИКЛУ -->
+            <section class="rounded-2xl p-4 bg-white dark:bg-gradient-to-br dark:from-slate-900 dark:via-darkcard dark:to-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-3">
+                <div class="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800">
+                    <div class="flex items-center gap-2">
+                        <span class="w-7 h-7 rounded-xl bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-sm font-bold">💰</span>
+                        <div>
+                            <h3 class="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider">Структура доходів циклу</h3>
+                            <div class="text-[10px] text-slate-500 dark:text-slate-400" id="incomes-tab-month-name">Жовтень 2026</div>
+                        </div>
+                    </div>
+                    <button onclick="openIncomeItemModal()" class="px-2.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold text-[11px] transition shadow-sm flex items-center gap-1">
+                        <span>＋ Нове надходження</span>
+                    </button>
+                </div>
+
+                <!-- 3 ПОКАЗНИКИ ДОХОДУ -->
+                <div class="grid grid-cols-3 gap-2 text-center">
+                    <div class="p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                        <span class="block text-[8px] uppercase tracking-wider text-slate-500 dark:text-slate-400 font-semibold">Всього доходу</span>
+                        <span class="font-black text-xs sm:text-sm text-emerald-600 dark:text-emerald-400 font-mono block mt-0.5" id="incomes-tab-total-all">0.00 ₴</span>
+                        <span class="text-[8px] text-slate-400 font-mono" id="incomes-tab-total-all-usdt">0 USDT</span>
+                    </div>
+                    <div class="p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                        <span class="block text-[8px] uppercase tracking-wider text-slate-500 dark:text-slate-400 font-semibold">Вже на руках (факт)</span>
+                        <span class="font-black text-xs sm:text-sm text-teal-600 dark:text-teal-400 font-mono block mt-0.5" id="incomes-tab-received-sum">0.00 ₴</span>
+                        <span class="text-[8px] text-slate-400 font-mono">отримано ✓</span>
+                    </div>
+                    <div class="p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                        <span class="block text-[8px] uppercase tracking-wider text-slate-500 dark:text-slate-400 font-semibold">Очікується</span>
+                        <span class="font-black text-xs sm:text-sm text-amber-600 dark:text-amber-400 font-mono block mt-0.5" id="incomes-tab-pending-sum">0.00 ₴</span>
+                        <span class="text-[8px] text-slate-400 font-mono">до отримання ⏳</span>
+                    </div>
+                </div>
+
+                <!-- ЗАРПЛАТА BINANCE (USDT) КАРТКА -->
+                <div class="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-between">
+                    <div class="flex items-center gap-2.5">
+                        <span class="text-xl">💼</span>
+                        <div>
+                            <div class="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                                <span>Зарплата (Binance)</span>
+                                <span class="px-1.5 py-0.2 rounded-md bg-emerald-500/20 text-[9px] font-mono text-emerald-600 dark:text-emerald-400 font-bold" id="incomes-tab-sal-day-badge">8 число</span>
+                            </div>
+                            <div class="text-[10px] text-slate-500 dark:text-slate-400 font-mono mt-0.5">
+                                <span id="incomes-tab-sal-usdt">0 USDT</span> • Курс: <span id="incomes-tab-sal-rate">—</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <div class="text-right">
+                            <span class="font-black text-xs sm:text-sm text-emerald-600 dark:text-emerald-400 font-mono block" id="incomes-tab-sal-uah">72,040.96 ₴</span>
+                            <span class="text-[8px] text-emerald-600/70 font-semibold">Фактичний вивід</span>
+                        </div>
+                        <button onclick="openSalarySettingsModal()" class="w-7 h-7 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-600 dark:text-emerald-300 flex items-center justify-center text-xs transition" title="Налаштувати ЗП та курс">
+                            ⚙️
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ГРУПИ НАДХОДЖЕНЬ ІЗ МОЖЛИВІСТЮ ДОДАВАННЯ ПУНКТІВ -->
+            <div id="incomes-groups-container" class="space-y-3.5">
+                <!-- Заповнюється динамічно функцією renderIncomesTab() -->
+            </div>
+
+            <!-- ШВИДКА КНОПКА ДОДАВАННЯ ВНИЗУ -->
+            <div class="pt-2">
+                <button onclick="openIncomeItemModal()" class="w-full py-3 px-4 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold text-xs rounded-2xl flex items-center justify-center gap-2 transition shadow-md">
+                    <span>＋ Додати надходження в будь-яку категорію</span>
+                </button>
+            </div>
+
+        </div>
+
+        <!-- СЕКЦІЯ 2: АНАЛІТИКА ТА ДІАГРАМИ -->
+        <div id="tab-analytics-content" class="space-y-3.5 hidden">
+
+            <!-- ПЕРЕМИКАЧ ТИПУ ПЕРІОДУ -->
+            <div class="flex items-center gap-2 p-1 bg-slate-200 dark:bg-darkcard border border-slate-300 dark:border-darkborder rounded-2xl">
+                <button id="btn-period-type-custom" onclick="setAnalyticsMode('custom')" class="flex-1 py-1.5 px-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 bg-emerald-500 text-slate-950 shadow-sm">
+                    <span>📅 Точний діапазон дат</span>
+                </button>
+                <button id="btn-period-type-presets" onclick="setAnalyticsMode('presets')" class="flex-1 py-1.5 px-2 rounded-xl text-xs font-medium transition flex items-center justify-center gap-1 text-slate-600 dark:text-slate-400 hover:text-white">
+                    <span>⚡ Швидкі періоди</span>
+                </button>
+            </div>
+
+            <!-- ПАНЕЛЬ ТОЧНОГО ВИБОРУ ДАТ -->
+            <div id="custom-date-range-panel" class="p-3 rounded-2xl bg-white dark:bg-darkcard border border-slate-200 dark:border-darkborder space-y-2.5">
+                <div class="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                    <span>🗓️ Вкажіть точні дати «З» та «По»</span>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-[10px] text-slate-500 dark:text-slate-400 mb-1">З числа (від):</label>
+                        <input type="date" id="custom-date-from" onchange="applyCustomDateRange()" class="w-full px-2.5 py-1.5 bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-100 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] text-slate-500 dark:text-slate-400 mb-1">По число (до):</label>
+                        <input type="date" id="custom-date-to" onchange="applyCustomDateRange()" class="w-full px-2.5 py-1.5 bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-100 outline-none">
+                    </div>
+                </div>
+                <div class="flex items-center gap-1.5 pt-1 overflow-x-auto text-[10px]">
+                    <button onclick="setCustomPreset('cycle')" class="px-2 py-1 bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 font-semibold rounded-lg whitespace-nowrap">
+                        🔄 ЗП-цикл (8-е — 7-е)
+                    </button>
+                    <button onclick="setCustomPreset('month')" class="px-2 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg whitespace-nowrap">
+                        1–31 число
+                    </button>
+                    <button onclick="setCustomPreset('today')" class="px-2 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg whitespace-nowrap">
+                        З 1-го по сьогодні
+                    </button>
+                </div>
+            </div>
+
+            <!-- ШВИДКІ ПЕРІОДИ (ПРЕСЕТИ) -->
+            <div id="quick-presets-panel" class="hidden flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+                <button onclick="setAnalyticsPeriod('current')" class="period-btn px-2.5 py-1 rounded-xl bg-slate-200 dark:bg-darkcard text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-darkborder transition" data-period="current">
+                    Поточний місяць
+                </button>
+                <button onclick="setAnalyticsPeriod('3m')" class="period-btn px-2.5 py-1 rounded-xl bg-slate-200 dark:bg-darkcard text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-darkborder transition" data-period="3m">
+                    3 міс
+                </button>
+                <button onclick="setAnalyticsPeriod('6m')" class="period-btn px-2.5 py-1 rounded-xl bg-slate-200 dark:bg-darkcard text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-darkborder transition" data-period="6m">
+                    6 міс
+                </button>
+                <button onclick="setAnalyticsPeriod('year')" class="period-btn px-2.5 py-1 rounded-xl bg-slate-200 dark:bg-darkcard text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-darkborder transition" data-period="year">
+                    Рік
+                </button>
+                <button onclick="setAnalyticsPeriod('all')" class="period-btn px-2.5 py-1 rounded-xl bg-slate-200 dark:bg-darkcard text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-darkborder transition" data-period="all">
+                    Весь час
+                </button>
+            </div>
+
+            <!-- ІНДИКАТОР ОБРАНОГО ПЕРІОДУ -->
+            <div class="flex items-center justify-between text-xs px-1">
+                <span class="text-slate-500 dark:text-slate-400">Аналіз за період:</span>
+                <span id="analytics-period-badge" class="font-bold text-slate-800 dark:text-slate-200 font-mono">Жовтень 2026</span>
+            </div>
+
+            <!-- КАРТКИ ПІДСУМКУ АНАЛІТИКИ (UAH + USD) -->
+            <div class="grid grid-cols-3 gap-2">
+                <div class="p-2.5 rounded-2xl bg-white dark:bg-darkcard border border-slate-200 dark:border-darkborder text-center">
+                    <span class="block text-[9px] text-slate-500 dark:text-slate-400">Дохід періоду</span>
+                    <span class="font-black text-xs text-emerald-600 dark:text-emerald-400 font-mono block mt-0.5" id="an-total-income">0 ₴</span>
+                    <span class="text-[9px] text-slate-400 font-mono" id="an-total-income-usd">$0.00</span>
+                </div>
+                <div class="p-2.5 rounded-2xl bg-white dark:bg-darkcard border border-slate-200 dark:border-darkborder text-center">
+                    <span class="block text-[9px] text-slate-500 dark:text-slate-400">Факт витрат</span>
+                    <span class="font-black text-xs text-slate-800 dark:text-slate-200 font-mono block mt-0.5" id="an-total-spent">0 ₴</span>
+                    <span class="text-[9px] text-slate-400 font-mono" id="an-total-spent-usd">$0.00</span>
+                </div>
+                <div class="p-2.5 rounded-2xl bg-white dark:bg-darkcard border border-slate-200 dark:border-darkborder text-center">
+                    <span class="block text-[9px] text-slate-500 dark:text-slate-400">Залишок/Резерв</span>
+                    <span class="font-black text-xs text-teal-600 dark:text-teal-400 font-mono block mt-0.5" id="an-total-free">0 ₴</span>
+                    <span class="text-[9px] text-slate-400 font-mono" id="an-total-free-usd">$0.00</span>
+                </div>
+            </div>
+
+            <!-- ДІАГРАМА КАТЕГОРІЙ -->
+            <section class="p-3.5 rounded-2xl bg-white dark:bg-darkcard border border-slate-200 dark:border-darkborder space-y-3">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h4 class="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                            <span>🍩 Структура витрат за категоріями</span>
+                        </h4>
+                        <p class="text-[10px] text-slate-500 dark:text-slate-400">Розподіл фінансів за статтями</p>
+                    </div>
+                    <select id="an-chart-mode" onchange="renderAnalyticsCharts()" class="text-[10px] px-2 py-1 bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-lg text-slate-700 dark:text-slate-200 outline-none">
+                        <option value="planned">Усі планові</option>
+                        <option value="paid">Лише сплачені</option>
+                    </select>
+                </div>
+
+                <div class="relative h-56 flex items-center justify-center">
+                    <canvas id="categoryChart"></canvas>
+                </div>
+
+                <div id="chart-legend-list" class="space-y-1.5 pt-2 border-t border-slate-200 dark:border-slate-800/80">
+                    <!-- Заповнюється скриптом з єдиними кольорами -->
+                </div>
+            </section>
+
+            <!-- ДІАГРАМА ДИНАМІКИ ПОМІСЯЧНО -->
+            <section class="p-3.5 rounded-2xl bg-white dark:bg-darkcard border border-slate-200 dark:border-darkborder space-y-3">
+                <div>
+                    <h4 class="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                        <span>📊 Динаміка: Дохід vs Витрати</span>
+                    </h4>
+                    <p class="text-[10px] text-slate-500 dark:text-slate-400">Порівняння прибутків та витрат помісячно</p>
+                </div>
+                <div class="relative h-52">
+                    <canvas id="dynamicsChart"></canvas>
+                </div>
+            </section>
+
+        </div>
+
+    </main>
+
+    <!-- МОДАЛЬНЕ ВІКНО: НАЛАШТУВАННЯ ЗП, ЗАОЩАДЖЕНЬ ТА КУРСУ USDT -->
+    <div id="salary-modal" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 hidden transition-opacity">
+        <div class="w-full max-w-md bg-white dark:bg-darkcard rounded-t-3xl sm:rounded-2xl border border-slate-200 dark:border-darkborder p-5 text-slate-800 dark:text-slate-100 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between mb-3 pb-2 border-b border-slate-200 dark:border-slate-800">
+                <h3 class="text-sm font-bold flex items-center gap-1.5">
+                    <span>⚙️</span>
+                    <span>Дохід циклу та ЗП</span>
+                    <span id="salary-modal-month-name" class="text-xs font-normal text-slate-400"></span>
+                </h3>
+                <button onclick="closeSalarySettingsModal()" class="w-7 h-7 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center text-xs">✕</button>
+            </div>
+
+            <form id="salary-settings-form" onsubmit="saveSalarySettings(event)" class="space-y-3">
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-1">День ЗП (1-31)</label>
+                        <input type="number" min="1" max="31" id="settings-salary-day" required class="w-full px-3 py-2 bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-100 font-mono focus:border-emerald-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-1">Сума в USDT (Binance)</label>
+                        <input type="number" step="0.01" id="settings-income-usdt" oninput="convertSalaryFromUSDT()" required placeholder="1000.00" class="w-full px-3 py-2 bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-emerald-600 dark:text-emerald-400 font-mono font-bold focus:border-emerald-500 outline-none">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-1">Курс P2P виводу (₴ за 1 USDT)</label>
+                    <input type="number" step="0.0001" id="settings-rate" oninput="convertSalaryFromUSDT()" required placeholder="41.50" class="w-full px-3 py-2 bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-100 font-mono focus:border-emerald-500 outline-none">
+                </div>
+
+                <div class="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 space-y-1.5">
+                    <div class="flex items-center justify-between">
+                        <label class="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">Фактично отримано в грн (₴ UAH)</label>
+                        <button type="button" onclick="recalcUAHFromRate()" class="text-[10px] text-slate-400 hover:text-emerald-500 underline">
+                            З розрахунку (USDT × Курс)
+                        </button>
+                    </div>
+                    <input type="number" step="0.01" id="settings-income-uah" oninput="onManualUahChange()" required placeholder="41500.00" class="w-full px-3 py-2.5 bg-white dark:bg-slate-950 border border-emerald-500/40 rounded-xl text-sm text-emerald-600 dark:text-emerald-400 font-mono font-black focus:border-emerald-500 outline-none shadow-inner">
+                    <div class="flex items-center justify-between text-[10px] text-slate-400 pt-0.5">
+                        <span>Середній курс фактичного виводу:</span>
+                        <span id="effective-rate-badge" class="font-mono font-bold text-slate-700 dark:text-slate-200">~45.02 ₴/₮</span>
+                    </div>
+                </div>
+
+                <!-- БЛОК ЗАОЩАДЖЕНЬ З ПОПЕРЕДНЬОГО МІСЯЦЯ -->
+                <div class="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800 space-y-2">
+                    <div class="text-[11px] font-bold text-slate-700 dark:text-slate-200 flex items-center justify-between">
+                        <span class="flex items-center gap-1.5">
+                            <span>🏦</span>
+                            <span>Заощадження з попереднього місяця</span>
+                        </span>
+                        <button type="button" onclick="autoFillSavingsFromPrevMonth()" class="text-[9px] text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-0.5" title="Підтягнути вільний залишок минулого циклу">
+                            <span>🔄 Взяти залишок</span>
+                        </button>
+                    </div>
+                    <input type="number" step="0.01" id="settings-savings-uah" placeholder="0.00" class="w-full px-3 py-2 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-100 font-mono focus:border-emerald-500 outline-none">
+                    <p class="text-[9px] text-slate-400">
+                        Встановіть вручну суму залишку, яка перейшла з попереднього місяця в новий цикл.
+                    </p>
+                </div>
+
+                <!-- БЛОК ДОДАТКОВОГО ЗАРОБІТКУ (ЗАГАЛЬНОГО) -->
+                <div class="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800 space-y-2">
+                    <div class="text-[11px] font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+                        <span>💼</span>
+                        <span>Додатковий заробіток (загальна сума)</span>
+                    </div>
+                    <input type="number" step="0.01" id="settings-extra-income-uah" placeholder="0.00" class="w-full px-3 py-2 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-100 font-mono focus:border-emerald-500 outline-none">
+                    <p class="text-[9px] text-slate-400">
+                        Якщо не хочете розписувати окремими рядками, вкажіть загальну суму додаткового прибутку тут.
+                    </p>
+                </div>
+
+                <!-- КАЛЬКУЛЯТОР ВИВОДІВ ЧАСТИНАМИ -->
+                <div class="border border-slate-200 dark:border-slate-800 rounded-xl p-2.5 bg-slate-50 dark:bg-slate-900/40">
+                    <button type="button" onclick="toggleMultiPartCalc()" class="w-full flex items-center justify-between text-xs text-slate-600 dark:text-slate-300 hover:text-white font-medium">
+                        <span class="flex items-center gap-1.5">
+                            <span>🧮</span>
+                            <span>Калькулятор виводів частинами</span>
+                        </span>
+                        <span id="multi-calc-arrow" class="text-xs transition-transform">▼</span>
+                    </button>
+                    <div id="multi-calc-body" class="mt-2 pt-2 border-t border-slate-200 dark:border-slate-800 space-y-2 hidden">
+                        <div id="multi-calc-rows" class="space-y-1.5">
+                            <input type="number" step="0.01" placeholder="Вивід 1 (грн)" class="multi-part-input w-full px-2.5 py-1.5 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg text-xs font-mono text-slate-800 dark:text-slate-200">
+                            <input type="number" step="0.01" placeholder="Вивід 2 (грн)" class="multi-part-input w-full px-2.5 py-1.5 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg text-xs font-mono text-slate-800 dark:text-slate-200">
+                        </div>
+                        <div class="flex items-center gap-2 pt-1">
+                            <button type="button" onclick="addMultiCalcRow()" class="px-2 py-1 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-[10px]">
+                                ＋ Додати рядок
+                            </button>
+                            <button type="button" onclick="applyMultiCalcSum()" class="flex-1 py-1 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-600 dark:text-emerald-300 font-bold rounded-lg text-[10px] border border-emerald-500/30">
+                                Підсумувати в дохід
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2 pt-2">
+                    <button type="button" onclick="closeSalarySettingsModal()" class="py-2.5 px-3 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-medium">
+                        Скасувати
+                    </button>
+                    <button type="submit" class="flex-1 py-2.5 px-4 bg-emerald-500 hover:bg-emerald-600 text-slate-950 rounded-xl text-xs font-bold transition shadow-md">
+                        Зберегти дохід
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- МОДАЛЬНЕ ВІКНО: СТВОРЕННЯ / РЕДАГУВАННЯ СТАТТІ НАДХОДЖЕННЯ -->
+    <div id="income-item-modal" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 hidden transition-opacity">
+        <div class="w-full max-w-md bg-white dark:bg-darkcard rounded-t-3xl sm:rounded-2xl border border-slate-200 dark:border-darkborder p-5 text-slate-800 dark:text-slate-100 shadow-2xl">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-sm font-bold flex items-center gap-1.5">
+                    <span>💰</span>
+                    <span id="income-item-modal-title">Додати надходження</span>
+                </h3>
+                <button onclick="closeIncomeItemModal()" class="w-7 h-7 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center text-xs">✕</button>
+            </div>
+
+            <form id="income-item-form" onsubmit="saveIncomeItem(event)" class="space-y-3">
+                <input type="hidden" id="modal-income-id">
+
+                <div>
+                    <div class="flex items-center justify-between mb-1">
+                        <label class="text-[11px] font-medium text-slate-500 dark:text-slate-400">Категорія надходження</label>
+                        <button type="button" id="income-modal-autofill-btn" onclick="autofillSavingsIntoModal()" class="text-[10px] text-emerald-600 dark:text-emerald-400 hover:underline hidden flex items-center gap-0.5">
+                            <span>🔄 Взяти залишок з минулого місяця</span>
+                        </button>
+                    </div>
+                    <select id="modal-income-category" onchange="onIncomeModalCategoryChange()" class="w-full px-3 py-2 bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-100 focus:border-emerald-500 outline-none">
+                    </select>
+                </div>
+
+                <!-- ПОЛЕ ДЛЯ ПОВЕРНЕННЯ БОРГУ (ХТО ПОВЕРНУВ / ДЖЕРЕЛО) -->
+                <div id="income-modal-debtor-group" class="hidden">
+                    <label class="block text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-1">Хто повертає борг (ПІБ / Ім'я)</label>
+                    <input type="text" id="modal-income-debtor" placeholder="Наприклад: Олена, Андрій" class="w-full px-3 py-2 bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-100 focus:border-emerald-500 outline-none">
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-1" id="modal-income-title-label">Призначення / Опис надходження</label>
+                    <input type="text" id="modal-income-title" required placeholder="Наприклад: Заощаджено на Моно, Фріланс верстка, Повернення за каву" class="w-full px-3 py-2 bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-100 focus:border-emerald-500 outline-none">
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-1">Сума ₴ (UAH)</label>
+                        <input type="number" step="0.01" id="modal-income-uah" required placeholder="0.00" class="w-full px-3 py-2 bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-100 font-mono font-bold focus:border-emerald-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-1">Число надходження (1-31)</label>
+                        <input type="number" min="1" max="31" id="modal-income-day" required value="1" class="w-full px-3 py-2 bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-100 font-mono focus:border-emerald-500 outline-none">
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2 pt-1">
+                    <input type="checkbox" id="modal-income-isreceived" checked class="w-4 h-4 rounded text-emerald-500 bg-slate-100 dark:bg-slate-900 border-slate-300 dark:border-slate-700 accent-emerald-500 cursor-pointer">
+                    <label for="modal-income-isreceived" class="text-xs text-slate-700 dark:text-slate-300 cursor-pointer select-none">Вже фактично отримано на руки</label>
+                </div>
+
+                <div class="flex items-center gap-2 pt-3">
+                    <button type="button" id="modal-income-delete-btn" onclick="deleteCurrentIncomeItem()" class="py-2.5 px-3 bg-rose-500/20 text-rose-500 dark:text-rose-300 border border-rose-500/30 rounded-xl text-xs font-semibold hover:bg-rose-500/30 transition hidden">
+                        Видалити
+                    </button>
+                    <button type="submit" class="flex-1 py-2.5 px-4 bg-emerald-500 hover:bg-emerald-600 text-slate-950 rounded-xl text-xs font-bold transition shadow-md">
+                        Зберегти надходження
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- МОДАЛЬНЕ ВІКНО: КАЛЬКУЛЯТОР ЗВІРКИ ЗАЛИШКУ -->
+    <div id="reconciliation-modal" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 hidden">
+        <div class="w-full max-w-md bg-white dark:bg-darkcard rounded-t-3xl sm:rounded-2xl border border-slate-200 dark:border-darkborder p-5 text-slate-800 dark:text-slate-100 shadow-2xl">
+            <div class="flex items-center justify-between mb-3">
+                <h3 class="text-sm font-bold flex items-center gap-1.5">
+                    <span>🧮</span>
+                    <span>Калькулятор звірки залишку</span>
+                </h3>
+                <button onclick="closeReconciliationModal()" class="w-7 h-7 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center text-xs">✕</button>
+            </div>
+            <p class="text-xs text-slate-500 dark:text-slate-400 mb-3 leading-relaxed">
+                Введіть реальну суму на банківській картці або в гаманці для швидкої перевірки безпечного залишку та виявлення забутих витрат.
+            </p>
+
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-1">Реальний баланс прямо зараз (₴)</label>
+                    <input type="number" step="0.01" id="recon-actual-input" oninput="calculateReconciliation()" placeholder="Наприклад: 18500.00" class="w-full px-3 py-2.5 bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-sm font-mono font-bold text-slate-900 dark:text-white focus:border-emerald-500 outline-none">
+                </div>
+
+                <div class="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 space-y-2 text-xs">
+                    <div class="flex justify-between">
+                        <span class="text-slate-500 dark:text-slate-400">Ще належить сплатити до кінця циклу:</span>
+                        <span class="font-bold text-amber-600 dark:text-amber-400 font-mono" id="recon-to-pay-display">0.00 ₴</span>
+                    </div>
+                    <div class="flex justify-between border-t border-slate-200 dark:border-slate-800 pt-2">
+                        <span class="font-medium text-slate-700 dark:text-slate-200">Безпечний залишок після оплат:</span>
+                        <span class="font-black text-emerald-600 dark:text-emerald-400 font-mono" id="recon-safe-balance-display">0.00 ₴</span>
+                    </div>
+                </div>
+
+                <!-- ДЕТЕКТОР ЗАБУТИХ ВИТРАТ -->
+                <div id="recon-discrepancy-card" class="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-300 text-xs space-y-2 hidden">
+                    <div class="flex items-center justify-between font-bold">
+                        <span>⚠️ Звірка з обліком:</span>
+                        <span id="recon-diff-display" class="font-mono">0.00 ₴</span>
+                    </div>
+                    <p class="text-[10px] text-amber-800 dark:text-amber-200/80" id="recon-diff-note">
+                        Фактичний залишок менший, ніж має бути за таблицею. Можливо, були необліковані покупки.
+                    </p>
+                    <button onclick="createExpenseFromDiscrepancy()" class="w-full py-1.5 px-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-lg text-[11px] transition">
+                        ➕ Занести цю різницю як «Необліковані витрати»
+                    </button>
+                </div>
+            </div>
+
+            <div class="pt-4">
+                <button onclick="closeReconciliationModal()" class="w-full py-2 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-xl text-xs font-semibold">
+                    Закрити
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- МОДАЛЬНЕ ВІКНО: СТВОРЕННЯ / РЕДАГУВАННЯ ВИТРАТИ -->
+    <div id="expense-modal" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 hidden">
+        <div class="w-full max-w-md bg-white dark:bg-darkcard rounded-t-3xl sm:rounded-2xl border border-slate-200 dark:border-darkborder p-5 text-slate-800 dark:text-slate-100 shadow-2xl">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-sm font-bold flex items-center gap-1.5">
+                    <span id="modal-title-icon">✏️</span>
+                    <span id="modal-expense-title">Додати витрату</span>
+                </h3>
+                <button onclick="closeExpenseModal()" class="w-7 h-7 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center text-xs">✕</button>
+            </div>
+
+            <form id="expense-form" onsubmit="saveExpense(event)" class="space-y-3">
+                <input type="hidden" id="modal-id">
+
+                <div>
+                    <label class="block text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-1">Призначення платежу</label>
+                    <input type="text" id="modal-title" required placeholder="Наприклад: Apple One, Продукти, Оренда" class="w-full px-3 py-2 bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-100 focus:border-emerald-500 outline-none">
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-1">Категорія</label>
+                        <select id="modal-category" class="w-full px-3 py-2 bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-100 focus:border-emerald-500 outline-none">
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-1">Розділ списку</label>
+                        <select id="modal-section" class="w-full px-3 py-2 bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-100 focus:border-emerald-500 outline-none">
+                            <option value="regular">📋 Обов'язкові регулярні</option>
+                            <option value="lifestyle">✨ Краса, догляд та додаткові</option>
+                            <option value="debts">💳 Борги та розстрочки</option>
+                            <option value="gifts">🎁 Подарунки та свята</option>
+                            <option value="charity">🕊️ Благодійність</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- ВИБІР ВАЛЮТИ ТА СУМИ -->
+                <div class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 space-y-2">
+                    <div class="flex items-center justify-between text-xs">
+                        <span class="text-[11px] font-medium text-slate-500 dark:text-slate-400">Валюта списання:</span>
+                        <div class="flex items-center gap-2">
+                            <label class="inline-flex items-center gap-1 cursor-pointer">
+                                <input type="radio" name="currency_type" value="uah" checked onchange="toggleCurrencyMode('uah')" class="accent-emerald-500">
+                                <span class="text-xs font-bold text-slate-700 dark:text-slate-300">₴ Гривня</span>
+                            </label>
+                            <label class="inline-flex items-center gap-1 cursor-pointer">
+                                <input type="radio" name="currency_type" value="usd" onchange="toggleCurrencyMode('usd')" class="accent-emerald-500">
+                                <span class="text-xs font-bold text-slate-700 dark:text-slate-300">$ Долар США</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-[10px] text-slate-500 dark:text-slate-400 mb-0.5">Сума ₴ (UAH)</label>
+                            <input type="number" step="0.01" id="modal-uah" oninput="onUahInput()" required placeholder="0.00" class="w-full px-3 py-1.5 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-100 font-mono font-bold focus:border-emerald-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-slate-500 dark:text-slate-400 mb-0.5">Сума $ (USD)</label>
+                            <input type="number" step="0.01" id="modal-usd" oninput="onUsdInput()" placeholder="0.00" class="w-full px-3 py-1.5 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-100 font-mono focus:border-emerald-500 outline-none">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-1">День сплати (1-31)</label>
+                        <input type="number" min="1" max="31" id="modal-day" required value="10" class="w-full px-3 py-2 bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-100 font-mono focus:border-emerald-500 outline-none">
+                    </div>
+                    <div class="flex items-center pt-5">
+                        <label class="inline-flex items-center gap-1.5 cursor-pointer">
+                            <input type="checkbox" id="modal-ispaid" class="w-4 h-4 rounded text-emerald-500 bg-slate-100 dark:bg-slate-900 border-slate-300 dark:border-slate-700 accent-emerald-500">
+                            <span class="text-xs text-slate-700 dark:text-slate-300 select-none">Вже сплачено</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2 pt-3">
+                    <button type="button" id="modal-delete-btn" onclick="deleteCurrentExpense()" class="py-2.5 px-3 bg-rose-500/20 text-rose-500 dark:text-rose-300 border border-rose-500/30 rounded-xl text-xs font-semibold hover:bg-rose-500/30 transition hidden">
+                        Видалити
+                    </button>
+                    <button type="button" id="modal-duplicate-btn" onclick="duplicateCurrentExpense()" class="py-2.5 px-3 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-semibold hover:bg-slate-300 dark:hover:bg-slate-700 transition hidden">
+                        📋 Дублювати
+                    </button>
+                    <button type="submit" class="flex-1 py-2.5 px-4 bg-emerald-500 hover:bg-emerald-600 text-slate-950 rounded-xl text-xs font-bold transition shadow-md">
+                        Зберегти витрату
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- МОДАЛЬНЕ ВІКНО: РЕЗЕРВНА КОПІЯ / BACKUP -->
+    <div id="backup-modal" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 hidden">
+        <div class="w-full max-w-md bg-white dark:bg-darkcard rounded-t-3xl sm:rounded-2xl border border-slate-200 dark:border-darkborder p-5 text-slate-800 dark:text-slate-100 shadow-2xl space-y-4">
+            <div class="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800">
+                <h3 class="text-sm font-bold flex items-center gap-1.5">
+                    <span>☁️</span>
+                    <span>Резервне копіювання даних</span>
+                </h3>
+                <button onclick="closeBackupModal()" class="w-7 h-7 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center text-xs">✕</button>
+            </div>
+
+            <p class="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                Усі ваші дані зберігаються виключно локально у вашому браузері (Offline First). Експортуйте файл резервної копії для перенесення на інший смартфон або збереження історії.
+            </p>
+
+            <div class="space-y-2">
+                <button onclick="exportDataBackup()" class="w-full py-2.5 px-4 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold text-xs rounded-xl flex items-center justify-center gap-2 transition shadow-sm">
+                    <span>💾 Завантажити резервну копію (.json)</span>
+                </button>
+                <label class="w-full py-2.5 px-4 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-xs rounded-xl flex items-center justify-center gap-2 transition cursor-pointer border border-slate-300 dark:border-slate-700">
+                    <span>📥 Відновити з файлу</span>
+                    <input type="file" id="backup-file-input" onchange="importDataBackup(event)" accept=".json" class="hidden">
+                </label>
+                <button onclick="resetToDemoData()" class="w-full py-2 px-3 text-rose-500 dark:text-rose-400 hover:underline text-[11px] font-medium text-center transition">
+                    Скинути до демо-даних
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ТОСТ-СПОВІЩЕННЯ -->
+    <div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-slate-900/90 text-white px-4 py-2 rounded-2xl text-xs font-medium shadow-2xl border border-slate-700 transition-all opacity-0 pointer-events-none flex items-center gap-2">
+        <span id="toast-icon">✅</span>
+        <span id="toast-msg">Повідомлення</span>
+    </div>
+</body>
+</html>

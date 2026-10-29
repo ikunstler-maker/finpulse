@@ -1,0 +1,28 @@
+{
+  "name": "finpulse",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:e2e": "playwright test"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@playwright/test": "1.63.0",
+    "autoprefixer": "10.6.2",
+    "eslint": "10.13.0",
+    "globals": "17.13.0",
+    "postcss": "8.5.32",
+    "tailwindcss": "3.4.19",
+    "vite": "8.3.5",
+    "vitest": "4.0.5"
+  },
+  "dependencies": {
+    "chart.js": "4.6.1"
+  }
+}
