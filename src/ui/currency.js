@@ -1,6 +1,7 @@
 import { round2 } from '../calc.js';
 import { t } from '../i18n/index.js';
 import { currencySymbol } from './format.js';
+import { fetchRates } from './rates.js';
 
 /**
  * Поля «сума + валюта + курс + фактично в гривнях».
@@ -28,6 +29,9 @@ export function currencyFields({ currency = 'UAH', amount = '', rate = '', uah =
                 <label for="${prefix}-uah">${t('money.uah')}</label>
                 <input id="${prefix}-uah" type="number" inputmode="decimal" step="0.01" min="0" value="${foreign && uah !== '' ? uah : ''}">
             </div>
+            <div class="rate-hint" data-rate-hint>
+                <button type="button" class="link-btn" data-rate-load>${t('rates.load')}</button>
+            </div>
         </div>`;
 }
 
@@ -47,6 +51,24 @@ export function wireCurrency(root, prefix = 'f') {
         root.querySelector('[data-foreign]').hidden = !foreign;
         root.querySelector('[data-rate-label]').textContent = t('money.rate', { cur: currencySymbol(b.dataset.cur) });
         if (foreign) recalcUAH();
+    });
+    root.addEventListener('click', async e => {
+        const use = e.target.closest('[data-rate-use]');
+        if (use && root.contains(use)) {
+            $('rate').value = use.dataset.rateUse;
+            recalcUAH();
+            return;
+        }
+        const load = e.target.closest('[data-rate-load]');
+        if (!load || !root.contains(load)) return;
+        const box = root.querySelector('[data-rate-hint]');
+        box.textContent = t('rates.loading');
+        const r = await fetchRates();
+        const fmt = n => n.toLocaleString('uk-UA', { maximumFractionDigits: 4 });
+        const rows = [];
+        if (r.nbu) rows.push(`<span>${t('rates.nbu', { rate: fmt(r.nbu.rate), date: r.nbu.date })}</span><button type="button" class="link-btn" data-rate-use="${r.nbu.rate}">${t('rates.use')}</button>`);
+        if (r.market) rows.push(`<span>${t('rates.market', { rate: fmt(r.market.rate) })}</span><button type="button" class="link-btn" data-rate-use="${r.market.rate}">${t('rates.use')}</button>`);
+        box.innerHTML = rows.length ? rows.map(x => `<div class="rate-row">${x}</div>`).join('') : `<span class="muted">${t('rates.failed')}</span>`;
     });
     $('amount').addEventListener('input', () => { if (current() !== 'UAH') recalcUAH(); });
     $('rate').addEventListener('input', recalcUAH);

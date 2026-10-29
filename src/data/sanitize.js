@@ -60,6 +60,12 @@ export function sanitizeState(raw) {
                     received: x.received !== false,
                 }));
         }
+        if ('goalMoves' in m) {
+            out.goalMoves = (Array.isArray(m.goalMoves) ? m.goalMoves : [])
+                .filter(x => x && typeof x === 'object' && SAFE_ID.test(str(x.goalId)))
+                .map(x => ({ id: SAFE_ID.test(str(x.id)) ? x.id : newId('gm'), goalId: x.goalId, amount: num(x.amount), day: num(x.day, 1) }));
+        }
+        if ('secondPayDay' in m) out.secondPayDay = num(m.secondPayDay);
         if ('incomes' in m) {
             out.incomes = (Array.isArray(m.incomes) ? m.incomes : [])
                 .map(i => cleanRecord(i, 'inc', { defaultCategory: 'other_inc', numbers: ['amountUAH', 'day'], booleans: ['isReceived', 'isPreset'] }))
@@ -72,6 +78,11 @@ export function sanitizeState(raw) {
     const activeMonthKey = months[raw.activeMonthKey] || keys.length === 0 ? raw.activeMonthKey : keys[keys.length - 1];
     const out = { ...raw, activeMonthKey, months };
     if ('version' in raw) out.version = num(raw.version);
+    if ('goals' in raw) {
+        out.goals = (Array.isArray(raw.goals) ? raw.goals : [])
+            .filter(g => g && typeof g === 'object')
+            .map(g => ({ id: SAFE_ID.test(str(g.id)) ? g.id : newId('goal'), name: str(g.name), target: num(g.target) }));
+    }
     if ('appMode' in raw) out.appMode = raw.appMode === 'edit' ? 'edit' : 'view';
     return out;
 }

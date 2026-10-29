@@ -1,7 +1,7 @@
 /** Стан інтерфейсу, який не зберігається в даних (вкладка, фільтри, період звітів). */
 export const view = {
     tab: 'budget',
-    category: 'all',
+    filter: { status: 'all', categories: [], min: null, max: null, search: '', sort: 'date' },
     reportPeriod: 'current',
     reportFrom: '',
     reportTo: '',

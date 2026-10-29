@@ -279,3 +279,39 @@ button { cursor: pointer; }
     .toast { bottom: 40px; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+/* Toolbar: search + filters */
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.toolbar { display: flex; gap: 8px; margin-bottom: 10px; }
+.search { flex: 1; min-width: 0; }
+.search input {
+    width: 100%; min-height: var(--tap); border: 1px solid var(--line); background: var(--surface); border-radius: 12px;
+    padding: 0 14px; font-size: 16px;
+}
+.filter-btn { min-height: var(--tap); gap: 6px; background: var(--surface); border: 1px solid var(--line); }
+.badge { display: inline-grid; place-items: center; min-width: 20px; height: 20px; border-radius: 99px; background: var(--accent); color: var(--on-accent); font-size: 12px; padding: 0 6px; }
+.link-btn { border: 0; background: transparent; color: var(--accent); font-weight: 700; padding: 8px 2px; min-height: var(--tap); }
+
+/* Goals */
+.goals { margin-top: 14px; background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); padding: 14px 16px; display: grid; gap: 10px; }
+.goals-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.goals-head h2 { margin: 0; font-size: 13px; letter-spacing: .06em; text-transform: uppercase; font-weight: 800; }
+.goals-empty, .goals-hint { margin: 0; font-size: 13px; color: var(--muted); }
+.goal { display: flex; gap: 10px; align-items: center; min-width: 0; }
+.goal-main { flex: 1; min-width: 0; border: 0; background: transparent; text-align: left; padding: 6px 0; display: grid; gap: 6px; min-height: var(--tap); }
+.goal-top { display: flex; justify-content: space-between; gap: 10px; font-size: 14px; }
+.goal-top strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.goal-top .num { color: var(--muted); font-size: 13px; flex: none; }
+.goal .small-btn { flex: none; }
+.goal-track { height: 8px; border-radius: 99px; background: var(--surface-2); overflow: hidden; display: block; }
+.goal-track i { display: block; height: 100%; background: var(--accent); border-radius: 99px; }
+.small-btn { min-height: var(--tap); font-size: 14px; padding: 0 12px; }
+
+/* Two pay periods */
+.periods { display: grid; gap: 6px; border-top: 1px solid var(--line); padding-top: 12px; }
+.periods .label { font-size: 13px; color: var(--muted); font-weight: 600; }
+
+/* Rate hint */
+.rate-hint { grid-column: 1 / -1; margin: -6px 0 10px; font-size: 13px; display: grid; gap: 2px; }
+.rate-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.rate-row .link-btn { min-height: 36px; padding: 4px 2px; }

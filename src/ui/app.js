@@ -1,7 +1,8 @@
 import { getNextMonthKey } from '../calc.js';
 import { t } from '../i18n/index.js';
 import { activeMonth, onStateChange, state } from '../state.js';
-import { budgetView, openExpenseSheet, togglePaid } from './budget.js';
+import { budgetView, openExpenseSheet, openFiltersSheet, resetFilters, setBudgetRerender, togglePaid } from './budget.js';
+import { openGoalSheet, openMoveSheet } from './goals.js';
 import { dayMonth } from './format.js';
 import { incomesView, openIncomeSheet, openPartSheet, openSalaryDaySheet, takeSavingsFromPrevious, toggleIncome, togglePart } from './incomes.js';
 import {
@@ -33,8 +34,14 @@ export function render() {
     fab.hidden = view.tab === 'reports';
     $('fab-label').textContent = view.tab === 'incomes' ? t('fab.income') : t('fab.expense');
     const main = $('view');
+    const searching = document.activeElement?.id === 'expense-search';
     main.className = `view view-${view.tab}`;
     main.innerHTML = view.tab === 'budget' ? budgetView() : view.tab === 'incomes' ? incomesView() : reportsView();
+    if (searching) {
+        const input = $('expense-search');
+        input?.focus({ preventScroll: true });
+        input?.setSelectionRange(input.value.length, input.value.length);
+    }
 }
 
 function setDefaultCustomRange() {
@@ -55,7 +62,12 @@ const actions = {
     'add-expense': () => openExpenseSheet(),
     'toggle-paid': el => togglePaid(el.dataset.month, el.dataset.id),
     'edit-expense': el => openExpenseSheet(el.dataset.month, el.dataset.id),
-    'filter-category': el => { view.category = el.dataset.category; render(); },
+    'filter-category': el => { view.filter.categories = el.dataset.category === 'all' ? [] : [el.dataset.category]; render(); },
+    'open-filters': () => openFiltersSheet(),
+    'reset-filters': () => resetFilters(),
+    'new-goal': () => openGoalSheet(),
+    'edit-goal': el => openGoalSheet(el.dataset.id),
+    'move-goal': el => openMoveSheet(el.dataset.id),
     'toggle-part': el => togglePart(el.dataset.id),
     'edit-part': el => openPartSheet(el.dataset.id),
     'add-part': () => openPartSheet(),
@@ -86,6 +98,7 @@ export function startApp() {
     applyTheme();
     applyStaticTexts();
     onStateChange(render);
+    setBudgetRerender(render);
     document.addEventListener('click', e => {
         const el = e.target.closest('[data-action]');
         if (!el) return;
@@ -94,9 +107,14 @@ export function startApp() {
     });
     document.addEventListener('change', e => {
         const el = e.target.closest('[data-action-input]');
-        if (!el) return;
+        if (!el || el.dataset.actionInput === 'search') return;
         if (el.dataset.actionInput === 'report-from') view.reportFrom = el.value;
         if (el.dataset.actionInput === 'report-to') view.reportTo = el.value;
+        render();
+    });
+    document.addEventListener('input', e => {
+        if (e.target.dataset?.actionInput !== 'search') return;
+        view.filter.search = e.target.value;
         render();
     });
     document.addEventListener('keydown', e => {

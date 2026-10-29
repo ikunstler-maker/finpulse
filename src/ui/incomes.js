@@ -38,7 +38,7 @@ function salaryCard(m) {
     return `
         <section class="section salary-section" aria-label="${t('salary.title')}">
             <div class="section-head"><h2>${t('salary.title')}</h2><span class="meta num">${money(total)}</span></div>
-            <p class="group-hint">${meta} · ${t('salary.payday', { day: m.salaryDay })}</p>
+            <p class="group-hint">${meta} · ${m.secondPayDay > m.salaryDay ? t('salary.paydays', { day: m.salaryDay, second: m.secondPayDay }) : t('salary.payday', { day: m.salaryDay })}</p>
             <div class="list">
                 ${parts.map(p => partRow(p, m)).join('') || `<div class="empty">${t('salary.empty')}</div>`}
                 <button class="add-row" data-action="add-part">${t('salary.addPart')}</button>
@@ -128,6 +128,11 @@ export function openSalaryDaySheet() {
                 <label for="f-salary-day">${t('salary.dayLabel', { month: monthName(m.year, m.month) })}</label>
                 <input id="f-salary-day" type="number" inputmode="numeric" min="1" max="28" value="${m.salaryDay}">
             </div>
+            <div class="field">
+                <label for="f-second-day">${t('salary.secondDayLabel')}</label>
+                <input id="f-second-day" type="number" inputmode="numeric" min="2" max="31" value="${m.secondPayDay || ''}" placeholder="${t('salary.secondDayPlaceholder')}">
+            </div>
+            <p class="sheet-text small">${t('salary.secondDayHint')}</p>
             <p class="form-error" id="form-error" role="alert" hidden></p>
             <div class="actions">
                 <button class="btn primary" type="submit">${t('common.save')}</button>
@@ -137,13 +142,17 @@ export function openSalaryDaySheet() {
     sheet.querySelector('#day-form').addEventListener('submit', ev => {
         ev.preventDefault();
         const day = parseInt(sheet.querySelector('#f-salary-day').value, 10);
-        if (!(day >= 1 && day <= 28)) {
-            const err = sheet.querySelector('#form-error');
-            err.textContent = t('salary.errDay');
-            err.hidden = false;
-            return;
-        }
-        update(() => { m.salaryDay = day; });
+        const secondRaw = sheet.querySelector('#f-second-day').value.trim();
+        const second = secondRaw === '' ? null : parseInt(secondRaw, 10);
+        const err = sheet.querySelector('#form-error');
+        const fail = msg => { err.textContent = msg; err.hidden = false; };
+        if (!(day >= 1 && day <= 28)) return fail(t('salary.errDay'));
+        if (second !== null && !(second > day && second <= 31)) return fail(t('salary.errSecondDay', { day }));
+        update(() => {
+            m.salaryDay = day;
+            if (second) m.secondPayDay = second;
+            else delete m.secondPayDay;
+        });
         closeSheet();
         toast(t('toast.saved'));
     });

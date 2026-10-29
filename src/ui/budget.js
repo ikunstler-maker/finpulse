@@ -1,4 +1,4 @@
-import { categorySummary, computeMonthSummary, DEFAULT_RATE, getNextMonthKey, isExpenseOverdue, salaryTotal } from '../calc.js';
+import { categorySummary, computeMonthSummary, DEFAULT_RATE, filterExpenses, getNextMonthKey, isExpenseOverdue, payPeriods, salaryTotal } from '../calc.js';
 import { CATEGORIES } from '../data/categories.js';
 import { newId } from '../data/migrate.js';
 import { plural, t } from '../i18n/index.js';
@@ -6,6 +6,7 @@ import { activeMonth, state, update } from '../state.js';
 import { currencyFields, readCurrency, wireCurrency } from './currency.js';
 import { dateOf, dayMonth, dayMonthLong, daysFrom, esc, foreign, money, money0, monthName } from './format.js';
 import { closeSheet, confirmSheet, openSheet, toast } from './sheet.js';
+import { goalsCard } from './goals.js';
 import { view } from './view-state.js';
 
 const catOf = id => CATEGORIES.find(c => c.id === id) || CATEGORIES.find(c => c.id === 'other');
@@ -45,10 +46,30 @@ export function summaryCard(today = new Date()) {
             <div class="rows">
                 <div class="rowline"><span>${t('summary.income')}<span class="sub">${salaryLine}</span></span><span class="val num" id="kpi-income">${money(s.totalIncomeUAH)}</span></div>
                 <div class="rowline"><span>${t('summary.toPay')}${bridgeLine}</span><span class="val num" id="kpi-to-pay">${money(s.remainingToPayUAH)}</span></div>
+                ${s.goalsAllocatedUAH ? `<div class="rowline"><span>${t('summary.goals')}<span class="sub">${t('summary.goalsSub')}</span></span><span class="val num" id="kpi-goals">${money(s.goalsAllocatedUAH)}</span></div>` : ''}
                 <div class="rowline free"><span>${t('summary.free')}<span class="sub">${t('summary.freeSub')}</span></span><span class="val num ${s.freeBalanceUAH < 0 ? 'neg' : ''}" id="kpi-free">${money(s.freeBalanceUAH)}</span></div>
             </div>
+            ${periodsBlock()}
             <p class="local-note">${t('summary.localNote')}</p>
         </section>`;
+}
+
+function periodsBlock() {
+    const periods = payPeriods(state, state.activeMonthKey);
+    if (!periods) return '';
+    return `
+        <div class="periods" id="pay-periods">
+            <div class="label">${t('periods.title')}</div>
+            <div class="rows">
+                ${periods.map((p, i) => `
+                    <div class="rowline">
+                        <span>${t(i === 0 ? 'periods.first' : 'periods.second', { from: dayMonth(p.from.month, p.from.day), to: dayMonth(p.to.month, p.to.day) })}
+                            <span class="sub num">${t('periods.sub', { income: money0(p.income), planned: money0(p.planned) })}</span></span>
+                        <span class="val num ${p.balance < 0 ? 'neg' : ''}">${money(p.balance)}</span>
+                    </div>`).join('')}
+            </div>
+            <p class="local-note">${t('periods.hint')}</p>
+        </div>`;
 }
 
 /* ---------- Список витрат ---------- */
@@ -89,8 +110,9 @@ function group(id, title, rows, sum, hint = '') {
 
 function categoryChips(categoryIds) {
     if (categoryIds.length < 2) return '';
+    const active = view.filter.categories.length === 1 ? view.filter.categories[0] : view.filter.categories.length ? 'many' : 'all';
     const chip = (id, name, color) => `
-        <button data-action="filter-category" data-category="${id}" aria-pressed="${view.category === id}">
+        <button data-action="filter-category" data-category="${id}" aria-pressed="${active === id}">
             ${color ? `<i class="dot" style="background:${color}"></i>` : ''}${esc(name)}</button>`;
     return `
         <div class="chips filter-chips" role="group" aria-label="${t('budget.filterLabel')}">
@@ -99,56 +121,168 @@ function categoryChips(categoryIds) {
         </div>`;
 }
 
+const flatMode = f => f.status !== 'all' || f.sort !== 'date' || f.search.trim() !== '' || f.min != null || f.max != null || f.categories.length > 1;
+export const activeFilterCount = f => [f.status !== 'all', f.sort !== 'date', f.min != null || f.max != null, f.categories.length > 1].filter(Boolean).length;
+
+function toolbar() {
+    const n = activeFilterCount(view.filter);
+    return `
+        <div class="toolbar">
+            <label class="search">
+                <span class="visually-hidden">${t('filters.search')}</span>
+                <input id="expense-search" type="search" placeholder="${t('filters.searchPlaceholder')}" value="${esc(view.filter.search)}" data-action-input="search" autocomplete="off">
+            </label>
+            <button class="btn ghost filter-btn" data-action="open-filters" aria-label="${t('filters.open')}">${t('filters.button')}${n ? ` <span class="badge">${n}</span>` : ''}</button>
+        </div>`;
+}
+
 export function budgetView(today = new Date()) {
     const key = state.activeMonthKey;
     const m = activeMonth();
     const nextKey = getNextMonthKey(key);
     const next = state.months[nextKey];
-    const inFilter = e => view.category === 'all' || e.category === view.category;
+    const f = view.filter;
     const bridgeItems = next ? next.expenses.filter(e => e.payDay < next.salaryDay) : [];
 
     const presentCats = [...new Set([...m.expenses, ...bridgeItems].map(e => e.category))]
         .sort((a, b) => CATEGORIES.findIndex(c => c.id === a) - CATEGORIES.findIndex(c => c.id === b));
-    if (view.category !== 'all' && !presentCats.includes(view.category)) view.category = 'all';
+    f.categories = f.categories.filter(c => presentCats.includes(c));
+    const inFilter = e => !f.categories.length || f.categories.includes(e.category);
 
-    const sorted = [...m.expenses].filter(inFilter).sort((a, b) => a.payDay - b.payDay);
-    const open = sorted.filter(e => !e.isPaid);
-    const overdue = open.filter(e => isExpenseOverdue(e, m, today));
-    const notOverdue = open.filter(e => !overdue.includes(e));
-    const soon = notOverdue.filter(e => daysFrom(today, dateOf(m, e.payDay)) <= 7);
-    const later = notOverdue.filter(e => !soon.includes(e));
-    const paid = sorted.filter(e => e.isPaid);
-    const bridge = bridgeItems.filter(inFilter).sort((a, b) => a.payDay - b.payDay);
-
-    const sum = list => list.reduce((s, e) => s + e.amountUAH, 0);
     const rows = (list, month, mk, opts) => list.map(e => expenseRow(e, month, mk, today, opts));
+    const sum = list => list.reduce((s, e) => s + e.amountUAH, 0);
 
     let filterNote = '';
-    if (view.category !== 'all') {
-        const cs = categorySummary(m.expenses, view.category);
+    if (f.categories.length === 1) {
+        const cs = categorySummary(m.expenses, f.categories[0]);
         filterNote = `<p class="filter-note num">${t('budget.filterNote', { total: money(cs.total), spent: money(cs.spent), remaining: money(cs.remaining) })}</p>`;
     }
 
-    const groups = [
-        group('overdue', t('budget.groups.overdue'), rows(overdue, m, key), sum(overdue), t('budget.groups.overdueHint')),
-        group('soon', t('budget.groups.soon'), rows(soon, m, key), sum(soon)),
-        group('later', t('budget.groups.later'), rows(later, m, key), sum(later)),
-        next ? group('bridge', t('budget.groups.bridge', { date: dayMonthLong(next.month, next.salaryDay) }), rows(bridge, next, nextKey, { bridge: true }), sum(bridge.filter(e => !e.isPaid)), t('budget.groups.bridgeHint')) : '',
-        group('paid', t('budget.groups.paid'), rows(paid, m, key), sum(paid)),
-    ].join('');
+    let content;
+    if (flatMode(f)) {
+        const all = [
+            ...m.expenses.map(e => ({ e, month: m, monthKey: key, bridge: false })),
+            ...bridgeItems.map(e => ({ e, month: next, monthKey: nextKey, bridge: true })),
+        ];
+        const found = filterExpenses(all, f, today);
+        content = `
+            <section class="section" data-group="results">
+                <div class="section-head"><h2>${t('filters.results')}</h2><span class="meta num">${found.length} · ${money(found.reduce((s, x) => s + x.e.amountUAH, 0))}</span></div>
+                <div class="list">${found.map(x => expenseRow(x.e, x.month, x.monthKey, today, { bridge: x.bridge })).join('') || `<p class="empty">${t('filters.nothing')}</p>`}</div>
+                <button class="link-btn" data-action="reset-filters">${t('filters.reset')}</button>
+            </section>`;
+    } else {
+        const sorted = [...m.expenses].filter(inFilter).sort((a, b) => a.payDay - b.payDay);
+        const open = sorted.filter(e => !e.isPaid);
+        const overdue = open.filter(e => isExpenseOverdue(e, m, today));
+        const notOverdue = open.filter(e => !overdue.includes(e));
+        const soon = notOverdue.filter(e => daysFrom(today, dateOf(m, e.payDay)) <= 7);
+        const later = notOverdue.filter(e => !soon.includes(e));
+        const paid = sorted.filter(e => e.isPaid);
+        const bridge = bridgeItems.filter(inFilter).sort((a, b) => a.payDay - b.payDay);
+        content = [
+            group('overdue', t('budget.groups.overdue'), rows(overdue, m, key), sum(overdue), t('budget.groups.overdueHint')),
+            group('soon', t('budget.groups.soon'), rows(soon, m, key), sum(soon)),
+            group('later', t('budget.groups.later'), rows(later, m, key), sum(later)),
+            next ? group('bridge', t('budget.groups.bridge', { date: dayMonthLong(next.month, next.salaryDay) }), rows(bridge, next, nextKey, { bridge: true }), sum(bridge.filter(e => !e.isPaid)), t('budget.groups.bridgeHint')) : '',
+            group('paid', t('budget.groups.paid'), rows(paid, m, key), sum(paid)),
+        ].join('');
+    }
 
     const empty = m.expenses.length === 0
         ? `<div class="list empty-state"><p>${t('budget.empty')}</p><button class="btn primary" data-action="add-expense">${t('budget.addFirst')}</button></div>`
         : '';
 
     return `
-        <div class="rail">${summaryCard(today)}</div>
+        <div class="rail">${summaryCard(today)}${goalsCard()}</div>
         <div class="main-col">
+            ${m.expenses.length ? toolbar() : ''}
             ${categoryChips(presentCats)}
             ${filterNote}
             ${empty}
-            ${groups}
+            ${content}
         </div>`;
+}
+
+/* ---------- Фільтри ---------- */
+
+const STATUSES = ['all', 'unpaid', 'overdue', 'soon', 'bridge', 'paid'];
+const SORTS = ['date', 'amountDesc', 'amountAsc', 'alpha'];
+
+export function openFiltersSheet() {
+    const m = activeMonth();
+    const f = view.filter;
+    const next = state.months[getNextMonthKey(state.activeMonthKey)];
+    const statuses = [...STATUSES, ...(m.secondPayDay > m.salaryDay ? ['period1', 'period2'] : [])];
+    const statusLabel = s => {
+        if (s === 'bridge') return t('filters.status.bridge', { date: next ? dayMonthLong(next.month, next.salaryDay) : '' });
+        if (s === 'period1') return t('filters.status.period1', { day: m.secondPayDay });
+        if (s === 'period2') return t('filters.status.period2', { day: m.secondPayDay });
+        return t(`filters.status.${s}`);
+    };
+    const sheet = openSheet(`
+        <h3>${t('filters.title')}</h3>
+        <form id="filters-form" novalidate>
+            <div class="field"><span class="lbl">${t('filters.show')}</span>
+                <div class="cats" role="group" aria-label="${t('filters.show')}">
+                    ${statuses.map(s => `<button type="button" data-status="${s}" aria-pressed="${f.status === s}">${statusLabel(s)}</button>`).join('')}
+                </div>
+            </div>
+            <div class="field"><span class="lbl">${t('filters.sort')}</span>
+                <div class="cats" role="group" aria-label="${t('filters.sort')}">
+                    ${SORTS.map(s => `<button type="button" data-sort="${s}" aria-pressed="${f.sort === s}">${t(`filters.sorts.${s}`)}</button>`).join('')}
+                </div>
+            </div>
+            <div class="field-pair">
+                <div class="field"><label for="f-min">${t('filters.min')}</label><input id="f-min" type="number" inputmode="decimal" min="0" value="${f.min ?? ''}"></div>
+                <div class="field"><label for="f-max">${t('filters.max')}</label><input id="f-max" type="number" inputmode="decimal" min="0" value="${f.max ?? ''}"></div>
+            </div>
+            <div class="field"><span class="lbl">${t('filters.categories')}</span>
+                <div class="cats" role="group" aria-label="${t('filters.categories')}">
+                    ${CATEGORIES.map(c => `<button type="button" data-fcat="${c.id}" aria-pressed="${f.categories.includes(c.id)}"><i class="dot" style="background:${c.color}"></i>${esc(c.name)}</button>`).join('')}
+                </div>
+            </div>
+            <div class="actions">
+                <button class="btn primary" type="submit">${t('filters.apply')}</button>
+                <button class="btn ghost" type="button" data-sheet="reset">${t('filters.reset')}</button>
+            </div>
+        </form>`, { label: t('filters.title') });
+    sheet.addEventListener('click', ev => {
+        const st = ev.target.closest('[data-status]');
+        if (st) sheet.querySelectorAll('[data-status]').forEach(b => b.setAttribute('aria-pressed', b === st));
+        const so = ev.target.closest('[data-sort]');
+        if (so) sheet.querySelectorAll('[data-sort]').forEach(b => b.setAttribute('aria-pressed', b === so));
+        const fc = ev.target.closest('[data-fcat]');
+        if (fc) fc.setAttribute('aria-pressed', fc.getAttribute('aria-pressed') !== 'true');
+        if (ev.target.closest('[data-sheet="reset"]')) {
+            resetFilters();
+            closeSheet();
+        }
+    });
+    sheet.querySelector('#filters-form').addEventListener('submit', ev => {
+        ev.preventDefault();
+        const numOrNull = v => (v === '' ? null : Math.max(0, parseFloat(v)));
+        view.filter = {
+            ...view.filter,
+            status: sheet.querySelector('[data-status][aria-pressed="true"]').dataset.status,
+            sort: sheet.querySelector('[data-sort][aria-pressed="true"]').dataset.sort,
+            min: numOrNull(sheet.querySelector('#f-min').value),
+            max: numOrNull(sheet.querySelector('#f-max').value),
+            categories: [...sheet.querySelectorAll('[data-fcat][aria-pressed="true"]')].map(b => b.dataset.fcat),
+        };
+        closeSheet();
+        rerender();
+    });
+}
+
+let rerender = () => {};
+export function setBudgetRerender(fn) {
+    rerender = fn;
+}
+
+export function resetFilters() {
+    view.filter = { ...view.filter, status: 'all', categories: [], min: null, max: null, search: '', sort: 'date' };
+    rerender();
 }
 
 /* ---------- Панель витрати ---------- */
@@ -175,7 +309,7 @@ export function openExpenseSheet(monthKey = state.activeMonthKey, id = null) {
     const { month, expense } = id ? findExpense(monthKey, id) : { month: state.months[monthKey] };
     if (!month) return;
     const isNew = !expense;
-    const e = expense || { title: '', category: view.category !== 'all' ? view.category : 'other', amountUAH: '', payDay: Math.min(new Date().getDate(), 28), isPaid: false };
+    const e = expense || { title: '', category: view.filter.categories.length === 1 ? view.filter.categories[0] : 'other', amountUAH: '', payDay: Math.min(new Date().getDate(), 28), isPaid: false };
     const currency = e.amountUSD > 0 ? e.currency || 'USD' : 'UAH';
     const rate = e.amountUSD > 0 ? Math.round(e.amountUAH / e.amountUSD * 10000) / 10000 : month.rate || DEFAULT_RATE;
 

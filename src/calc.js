@@ -129,7 +129,8 @@ export function computeMonthSummary(state, monthKey, today = new Date()) {
 
     const inHandUAH = Math.max(0, totalReceivedIncomeUAH - totalPaidUAH);
     const remainingToPayUAH = totalPendingUAH + bridge.total;
-    const freeBalanceUAH = totalIncomeUAH - (totalPlannedUAH + bridge.total);
+    const goalsAllocatedUAH = goalMovesTotal(month);
+    const freeBalanceUAH = totalIncomeUAH - (totalPlannedUAH + bridge.total) - goalsAllocatedUAH;
     const totalObligations = totalPlannedUAH + bridge.total;
     const pctPaid = totalObligations > 0 ? Math.min(100, Math.round((totalPaidUAH / totalObligations) * 100)) : 0;
     const pctPending = totalObligations > 0 ? Math.min(100 - pctPaid, Math.round((remainingToPayUAH / totalObligations) * 100)) : 0;
@@ -148,6 +149,7 @@ export function computeMonthSummary(state, monthKey, today = new Date()) {
         inHandUAH,
         inHandUSD: month.rate ? inHandUAH / month.rate : 0,
         remainingToPayUAH,
+        goalsAllocatedUAH,
         freeBalanceUAH,
         freeBalanceUSD: month.rate ? freeBalanceUAH / month.rate : 0,
         totalObligations,
@@ -302,4 +304,102 @@ export function setIncomeCategoryTotal(month, category, total) {
     const synced = sumUAH((month.incomes || []).filter(i => i.category === category));
     if (category === 'savings') month.savingsUAH = synced;
     if (category === 'extra') month.extraIncomeUAH = synced;
+}
+
+/* ---------- Цілі (конверти) ---------- */
+
+/**
+ * Цілі — віртуальні конверти: гроші лишаються на картці, але вже «зайняті».
+ * Відкладене в місяці зменшує вільний залишок цього місяця; «на руках» не змінює.
+ */
+export function goalMovesTotal(month, goalId = null) {
+    return (month.goalMoves || [])
+        .filter(m => !goalId || m.goalId === goalId)
+        .reduce((s, m) => s + (m.amount || 0), 0);
+}
+
+/** Скільки накопичено в цілі за всі місяці. */
+export function goalBalance(state, goalId) {
+    return round2(Object.values(state.months).reduce((s, m) => s + goalMovesTotal(m, goalId), 0));
+}
+
+export function goalProgress(state, goal) {
+    const saved = goalBalance(state, goal.id);
+    const pct = goal.target > 0 ? Math.min(100, Math.round(saved / goal.target * 100)) : 0;
+    return { saved, pct, left: Math.max(0, round2((goal.target || 0) - saved)) };
+}
+
+/* ---------- Дві виплати (аванс + основна) ---------- */
+
+/**
+ * Якщо в місяці є друга виплата (secondPayDay > salaryDay), цикл ділиться на два періоди:
+ * 1) від першої виплати до дня перед другою; 2) від другої до наступної першої (з «містком»).
+ * Залишок першого періоду переходить у другий, тож кінцевий залишок = вільний залишок без цілей.
+ */
+export function payPeriods(state, monthKey) {
+    const m = state.months[monthKey];
+    const second = m.secondPayDay;
+    if (!(second > m.salaryDay)) return null;
+    const next = state.months[getNextMonthKey(monthKey)];
+    const bridge = bridgeExpenses(next);
+    const before = d => (d || 1) < second;
+    const partsSum = pred => (m.salaryParts || []).filter(p => pred(p.day)).reduce((s, p) => s + (p.uah || 0), 0)
+        + (Array.isArray(m.salaryParts) ? 0 : (pred(m.salaryDay) ? m.incomeUAH || 0 : 0));
+    const itemsSum = pred => (m.incomes || []).filter(i => pred(i.day)).reduce((s, i) => s + (i.amountUAH || 0), 0);
+    const expSum = (pred, paidOnly = false) => m.expenses.filter(e => pred(e.payDay) && (!paidOnly || e.isPaid)).reduce((s, e) => s + e.amountUAH, 0);
+
+    const income1 = partsSum(before) + itemsSum(before);
+    const income2 = partsSum(d => !before(d)) + itemsSum(d => !before(d));
+    const planned1 = expSum(before);
+    const planned2 = expSum(d => !before(d)) + bridge.total;
+    const balance1 = round2(income1 - planned1);
+    return [
+        { from: { month: m.month, day: m.salaryDay }, to: { month: m.month, day: second - 1 }, income: round2(income1), planned: round2(planned1), paid: round2(expSum(before, true)), balance: balance1 },
+        {
+            from: { month: m.month, day: second },
+            to: { month: m.month === 12 ? 1 : m.month + 1, day: Math.max(1, (next?.salaryDay || m.salaryDay) - 1) },
+            income: round2(income2), planned: round2(planned2), paid: round2(expSum(d => !before(d), true) + sumUAH(bridge.items.filter(e => e.isPaid))),
+            balance: round2(balance1 + income2 - planned2),
+        },
+    ];
+}
+
+/** До якого періоду належить день місяця (1 або 2); null — якщо другої виплати немає. */
+export function periodOfDay(month, day) {
+    if (!(month.secondPayDay > month.salaryDay)) return null;
+    return day < month.secondPayDay ? 1 : 2;
+}
+
+/* ---------- Фільтри й сортування витрат ---------- */
+
+/**
+ * Відбирає й сортує витрати. items — [{ e, month, monthKey, bridge }].
+ * status: all | unpaid | overdue | soon | bridge | paid | period1 | period2.
+ */
+export function filterExpenses(items, { status = 'all', categories = [], min = null, max = null, search = '', sort = 'date' } = {}, today = new Date()) {
+    const q = search.trim().toLowerCase();
+    const days = x => Math.round((new Date(x.month.year, x.month.month - 1, x.e.payDay) - new Date(today.getFullYear(), today.getMonth(), today.getDate())) / 86400000);
+    const byStatus = {
+        all: () => true,
+        unpaid: x => !x.e.isPaid,
+        overdue: x => !x.bridge && !x.e.isPaid && isExpenseOverdue(x.e, x.month, today),
+        soon: x => !x.e.isPaid && !(x.bridge ? false : isExpenseOverdue(x.e, x.month, today)) && days(x) >= 0 && days(x) <= 7,
+        bridge: x => x.bridge,
+        paid: x => x.e.isPaid,
+        period1: x => !x.bridge && periodOfDay(x.month, x.e.payDay) === 1,
+        period2: x => x.bridge || periodOfDay(x.month, x.e.payDay) === 2,
+    }[status] || (() => true);
+    const out = items.filter(x => byStatus(x)
+        && (!categories.length || categories.includes(x.e.category))
+        && (min == null || x.e.amountUAH >= min)
+        && (max == null || x.e.amountUAH <= max)
+        && (!q || x.e.title.toLowerCase().includes(q)));
+    const dateKey = x => (x.bridge ? 100 : 0) + x.e.payDay;
+    const sorters = {
+        date: (a, b) => dateKey(a) - dateKey(b),
+        amountDesc: (a, b) => b.e.amountUAH - a.e.amountUAH,
+        amountAsc: (a, b) => a.e.amountUAH - b.e.amountUAH,
+        alpha: (a, b) => a.e.title.localeCompare(b.e.title, 'uk'),
+    };
+    return out.sort(sorters[sort] || sorters.date);
 }

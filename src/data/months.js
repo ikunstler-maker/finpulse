@@ -19,6 +19,7 @@ export function createNextMonth(state, key) {
         month: m,
         name: monthName(y, m),
         salaryDay: cur.salaryDay,
+        ...(cur.secondPayDay ? { secondPayDay: cur.secondPayDay } : {}),
         incomeUAH: cur.incomeUAH,
         incomeUSD: cur.incomeUSD,
         incomeUSDT: cur.incomeUSDT,
