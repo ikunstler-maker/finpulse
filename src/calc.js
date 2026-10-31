@@ -210,6 +210,8 @@ export function collectAnalytics(state, { period, from, to }) {
     let totalIncome = 0;
     let totalIncomeUSD = 0;
     let selectedMonths = [];
+    const incomeByCategory = {};
+    const addIncome = (cat, v) => { if (v) incomeByCategory[cat] = (incomeByCategory[cat] || 0) + v; };
 
     if (period === 'custom') {
         const fromD = from ? new Date(from + 'T00:00:00') : new Date('2020-01-01');
@@ -223,6 +225,7 @@ export function collectAnalytics(state, { period, from, to }) {
                     const partD = new Date(m.year, m.month - 1, p.day || m.salaryDay || 8);
                     if (partD >= fromD && partD <= toD) {
                         totalIncome += p.uah || 0;
+                        addIncome('salary', p.uah || 0);
                         totalIncomeUSD += p.currency === 'UAH' ? (m.rate ? p.uah / m.rate : 0) : p.amount || 0;
                     }
                 });
@@ -230,6 +233,7 @@ export function collectAnalytics(state, { period, from, to }) {
                 const salD = new Date(m.year, m.month - 1, m.salaryDay || 8);
                 if (salD >= fromD && salD <= toD) {
                     totalIncome += m.incomeUAH || 0;
+                    addIncome('salary', m.incomeUAH || 0);
                     totalIncomeUSD += salaryForeignTotal(m);
                 }
             }
@@ -237,6 +241,7 @@ export function collectAnalytics(state, { period, from, to }) {
                 const incD = new Date(m.year, m.month - 1, inc.day || 1);
                 if (incD >= fromD && incD <= toD) {
                     totalIncome += inc.amountUAH || 0;
+                    addIncome(inc.category, inc.amountUAH || 0);
                     if (m.rate > 0) totalIncomeUSD += inc.amountUAH / m.rate;
                 }
             });
@@ -247,7 +252,7 @@ export function collectAnalytics(state, { period, from, to }) {
                 }
             });
         });
-        return { expenses, totalIncome, totalIncomeUSD, selectedMonths };
+        return { expenses, totalIncome, totalIncomeUSD, selectedMonths, incomeByCategory };
     }
 
     const curIdx = allKeys.indexOf(state.activeMonthKey);
@@ -268,11 +273,51 @@ export function collectAnalytics(state, { period, from, to }) {
     selectedMonths.filter(Boolean).forEach(m => {
         totalIncome += monthIncomeTotal(m);
         totalIncomeUSD += salaryForeignTotal(m);
+        addIncome('salary', salaryTotal(m));
+        (m.incomes || []).forEach(inc => addIncome(inc.category, inc.amountUAH || 0));
         (m.expenses || []).forEach(e => {
             expenses.push({ ...e, monthKey: `${m.year}-${m.month}`, monthRate: m.rate });
         });
     });
-    return { expenses, totalIncome, totalIncomeUSD, selectedMonths };
+    return { expenses, totalIncome, totalIncomeUSD, selectedMonths, incomeByCategory };
+}
+
+/**
+ * Доходи по категоріях для звіту, від більшої до меншої.
+ * categories — [{ id, … }]; зарплата має id 'salary'. Невідомі категорії — в останню (інші).
+ */
+export function incomeTotals(incomeByCategory, categories) {
+    const known = new Set(categories.map(c => c.id));
+    const sums = {};
+    for (const [id, v] of Object.entries(incomeByCategory || {})) {
+        const key = known.has(id) ? id : categories[categories.length - 1].id;
+        sums[key] = (sums[key] || 0) + v;
+    }
+    return categories
+        .filter(c => sums[c.id] > 0)
+        .sort((a, b) => sums[b.id] - sums[a.id])
+        .map(c => ({ category: c, amountUAH: round2(sums[c.id]) }));
+}
+
+/**
+ * «Скільки можна витратити сьогодні»: вільні гроші, поділені на дні до наступної ЗП.
+ * Вільні = менше з двох: вільний залишок плану і (на руках − ще сплатити − відкладено в цілі),
+ * щоб не рахувати гроші, які ще не надійшли. Лише для циклу, у якому сьогоднішній день;
+ * інакше null. Дні — від сьогодні до дня перед наступною ЗП включно.
+ */
+export function dailyAllowance(state, monthKey, today = new Date()) {
+    const m = state.months[monthKey];
+    if (!m) return null;
+    const next = state.months[getNextMonthKey(monthKey)];
+    const start = new Date(m.year, m.month - 1, m.salaryDay || 1);
+    const end = new Date(m.year, m.month, (next?.salaryDay || m.salaryDay || 1) - 1);
+    const day = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    if (day < start || day > end) return null;
+    const daysLeft = Math.round((end - day) / 86400000) + 1;
+    const s = computeMonthSummary(state, monthKey, today);
+    const cash = s.inHandUAH - s.remainingToPayUAH - s.goalsAllocatedUAH;
+    const available = round2(Math.max(0, Math.min(s.freeBalanceUAH, cash)));
+    return { daysLeft, available, perDay: Math.floor(available / daysLeft * 100) / 100, end: { month: end.getMonth() + 1, day: end.getDate() } };
 }
 
 /** Суми по категоріях для діаграми, від більшої до меншої. */

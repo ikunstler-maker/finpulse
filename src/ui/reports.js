@@ -1,5 +1,5 @@
-import { categoryTotals, collectAnalytics, monthIncomeTotal } from '../calc.js';
-import { CATEGORIES } from '../data/categories.js';
+import { categoryTotals, collectAnalytics, incomeTotals, monthIncomeTotal } from '../calc.js';
+import { CATEGORIES, INCOME_CATEGORIES } from '../data/categories.js';
 import { t } from '../i18n/index.js';
 import { state } from '../state.js';
 import { esc, money0 } from './format.js';
@@ -20,6 +20,17 @@ function periodLabel(selectedMonths) {
     return months.length === 1 ? months[0].name : `${months[0].name} — ${months[months.length - 1].name}`;
 }
 
+/** Горизонтальні смуги «категорія — частка — сума». */
+function bars(list) {
+    const max = list[0]?.amountUAH || 1;
+    const sum = list.reduce((s, x) => s + x.amountUAH, 0);
+    return list.map(({ category: c, amountUAH: v }) => `
+        <div class="hbar">
+            <div class="hbar-top"><span><i class="dot" style="background:${c.color}"></i>${esc(c.name)}</span><span class="num"><span class="muted">${Math.round(v / sum * 100)}%</span> <strong>${money0(v)}</strong></span></div>
+            <div class="hbar-track"><i style="width:${(v / max * 100).toFixed(1)}%;background:${c.color}"></i></div>
+        </div>`).join('');
+}
+
 export function reportsView() {
     const data = collectAnalytics(state, { period: view.reportPeriod, from: view.reportFrom, to: view.reportTo });
     const paid = data.expenses.filter(e => e.isPaid);
@@ -27,8 +38,8 @@ export function reportsView() {
     const paidSum = paid.reduce((s, e) => s + e.amountUAH, 0);
     const chartExpenses = view.reportMode === 'paid' ? paid : data.expenses;
     const totals = categoryTotals(chartExpenses, CATEGORIES);
-    const max = totals[0]?.amountUAH || 1;
-    const sum = totals.reduce((s, x) => s + x.amountUAH, 0);
+    const incomeCats = [{ id: 'salary', name: t('reports.salary'), color: '#157a5b' }, ...INCOME_CATEGORIES];
+    const incomes = incomeTotals(data.incomeByCategory, incomeCats);
 
     const keys = Object.keys(state.months).sort();
     const activeIdx = Math.max(0, keys.indexOf(state.activeMonthKey));
@@ -64,13 +75,11 @@ export function reportsView() {
                         <button data-action="report-mode" data-mode="paid" aria-pressed="${view.reportMode === 'paid'}">${t('reports.modePaid')}</button>
                     </div>
                 </div>
-                <div class="list bars" id="category-bars">
-                    ${totals.map(({ category: c, amountUAH: v }) => `
-                        <div class="hbar">
-                            <div class="hbar-top"><span><i class="dot" style="background:${c.color}"></i>${esc(c.name)}</span><span class="num"><span class="muted">${Math.round(v / sum * 100)}%</span> <strong>${money0(v)}</strong></span></div>
-                            <div class="hbar-track"><i style="width:${(v / max * 100).toFixed(1)}%;background:${c.color}"></i></div>
-                        </div>`).join('') || `<p class="empty">${t('reports.noExpenses')}</p>`}
-                </div>
+                <div class="list bars" id="category-bars">${bars(totals) || `<p class="empty">${t('reports.noExpenses')}</p>`}</div>
+            </section>
+            <section class="section">
+                <div class="section-head"><h2>${t('reports.incomeTitle')}</h2><span class="meta">${t('reports.incomeMeta')}</span></div>
+                <div class="list bars" id="income-bars">${bars(incomes) || `<p class="empty">${t('reports.noIncome')}</p>`}</div>
             </section>
             <section class="section">
                 <div class="section-head"><h2>${t('reports.monthsTitle')}</h2><span class="meta">${t('reports.monthsMeta')}</span></div>

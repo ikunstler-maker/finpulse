@@ -1,4 +1,4 @@
-import { categorySummary, computeMonthSummary, DEFAULT_RATE, filterExpenses, getNextMonthKey, isExpenseOverdue, payPeriods, salaryTotal } from '../calc.js';
+import { categorySummary, computeMonthSummary, dailyAllowance, DEFAULT_RATE, filterExpenses, getNextMonthKey, isExpenseOverdue, payPeriods, salaryTotal } from '../calc.js';
 import { CATEGORIES } from '../data/categories.js';
 import { newId } from '../data/migrate.js';
 import { plural, t } from '../i18n/index.js';
@@ -21,6 +21,7 @@ const catOf = id => CATEGORIES.find(c => c.id === id) || CATEGORIES.find(c => c.
 export function summaryCard(today = new Date()) {
     const m = activeMonth();
     const s = computeMonthSummary(state, state.activeMonthKey, today);
+    const daily = dailyAllowance(state, state.activeMonthKey, today);
     const next = s.nextMonth;
     const thisMonthLeft = Math.max(0, s.remainingToPayUAH - s.bridgeTotalUAH);
     const pct = x => `${(x / Math.max(1, s.totalObligations) * 100).toFixed(1)}%`;
@@ -53,6 +54,7 @@ export function summaryCard(today = new Date()) {
                 <div class="rowline"><span>${t('summary.toPay')}${bridgeLine}</span><span class="val num" id="kpi-to-pay">${money(s.remainingToPayUAH)}</span></div>
                 ${s.goalsAllocatedUAH ? `<div class="rowline"><span>${t('summary.goals')}<span class="sub">${t('summary.goalsSub')}</span></span><span class="val num" id="kpi-goals">${money(s.goalsAllocatedUAH)}</span></div>` : ''}
                 <div class="rowline free"><span>${t('summary.free')}<span class="sub">${t('summary.freeSub')}</span></span><span class="val num ${s.freeBalanceUAH < 0 ? 'neg' : ''}" id="kpi-free">${money(s.freeBalanceUAH)}</span></div>
+                ${daily ? `<div class="rowline daily"><span>${t('summary.daily')}<span class="sub">${t('summary.dailySub', { n: daily.daysLeft, days: plural(daily.daysLeft, t('summary.daysWord').split(',')), date: dayMonthLong(daily.end.month, daily.end.day), available: money0(daily.available) })}</span></span><span class="val num" id="kpi-daily">${money(daily.perDay)}</span></div>` : ''}
             </div>
             ${periodsBlock()}
             ${goalsRow()}
