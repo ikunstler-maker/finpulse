@@ -346,7 +346,10 @@ export function openExpenseSheet(monthKey = state.activeMonthKey, id = null) {
 
     wireCurrency(sheet);
     wirePickers(sheet);
+<<<<<<< HEAD
     wireRepeat(sheet);
+=======
+>>>>>>> origin/main
     sheet.addEventListener('click', ev => {
         if (ev.target.closest('#f-paid')) {
             const sw = sheet.querySelector('#f-paid');
