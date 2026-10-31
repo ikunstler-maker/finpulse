@@ -498,3 +498,24 @@ export function nextRecurrence(expense) {
     }
     return expense?.repeat ? { repeat: true } : null;
 }
+
+/**
+ * Несплачені витрати від сьогодні на `days` днів уперед (0 — лише сьогодні), з усіх місяців.
+ * Дата платежу — число місяця витрати (31 у коротшому місяці — останній день).
+ * Повертає [{ monthKey, expense, date: { y, m, d }, inDays }] за датою.
+ */
+export function upcomingPayments(state, today = new Date(), days = 1) {
+    const day0 = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const out = [];
+    for (const [monthKey, m] of Object.entries(state.months || {})) {
+        if (!m || !Array.isArray(m.expenses)) continue;
+        const last = new Date(m.year, m.month, 0).getDate();
+        for (const e of m.expenses) {
+            if (e.isPaid) continue;
+            const d = Math.min(Math.max(1, e.payDay || 1), last);
+            const inDays = Math.round((new Date(m.year, m.month - 1, d) - day0) / 86400000);
+            if (inDays >= 0 && inDays <= days) out.push({ monthKey, expense: e, date: { y: m.year, m: m.month, d }, inDays });
+        }
+    }
+    return out.sort((a, b) => a.inDays - b.inDays || (b.expense.amountUAH || 0) - (a.expense.amountUAH || 0));
+}
