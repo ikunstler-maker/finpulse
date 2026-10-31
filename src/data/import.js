@@ -53,7 +53,7 @@ const SYNONYMS = {
     date: ['дата', 'date', 'дата операції', 'дата і час операції', 'дата и время операции', 'час', 'day', 'день'],
     title: ['назва', 'опис', 'опис операції', 'деталі операції', 'призначення', 'title', 'description', 'name', 'описание', 'коментар', 'comment'],
     amount: ['сума', 'сума в валюті картки (uah)', 'сума в валюті картки', 'сума, грн', 'amount', 'sum', 'сумма', 'uah', 'грн', '₴'],
-    usd: ['$', 'usd', 'us$', 'сума, $', 'долари'],
+    usd: ['$', 'usd', 'us$', 'сума, $', 'долари', 'сума у валюті', 'у валюті'],
     type: ['тип', 'type', 'вид'],
     category: ['категорія', 'category', 'категория'],
     card: ['картка', 'карта', 'card', 'рахунок', 'account'],
@@ -248,10 +248,19 @@ export function rowsFromCSV(table, mapping, { hasHeader = true, ctx = null } = {
  * Повертає те, що потрібно вікну імпорту (table — від рядка заголовків).
  */
 export function analyzeCSV(text, fileName = '', { defaultDay = 1 } = {}) {
-    const all = parseCSV(text);
+    return analyzeTable(parseCSV(text), [fileName], { defaultDay });
+}
+
+/**
+ * Те саме для готової таблиці (аркуш Excel). names — де шукати місяць: назва аркуша, файлу.
+ * Порожні рядки на початку пропускаються, клітинки — рядками.
+ */
+export function analyzeTable(rows, names = [], { defaultDay = 1 } = {}) {
+    const all = rows.slice(0, MAX_ROWS + 10).map(r => Array.from(r || [], v => String(v ?? '')));
+    while (all.length && all[0].every(v => !v.trim())) all.shift();
     const table = all.slice(findHeaderRow(all));
     const mapping = guessMapping(table[0] || [], table.slice(1));
-    const found = contextFromName(fileName, (all[0] || []).join(' '));
+    const found = contextFromName(...names, (all[0] || []).join(' '));
     const ctx = found ? { ...found, defaultDay, lockMonth: true } : null;
     return { table, mapping, ctx };
 }
@@ -303,6 +312,11 @@ function rowsFromBackup(data) {
             // Формат 6+: без позначки — одноразова; старі бекапи — усі щомісячні, як і було.
             ...((data.version >= 6 ? !e.repeat : 'repeat' in e && !e.repeat) ? { repeat: false } : {}),
             ...(e.installment ? { installment: e.installment } : {}),
+        }));
+        // Частини зарплати — як рядки «зарплата» (імпорт створить частини ЗП).
+        (Array.isArray(m.salaryParts) ? m.salaryParts : []).forEach(p => p && p.uah > 0 && rows.push({
+            type: 'income', salary: true, category: '', date: date(p.day), title: '', amount: p.uah, card: cardName(p.cardId), paid: p.received !== false,
+            ...(p.currency && p.currency !== 'UAH' && p.amount > 0 ? { usd: p.amount, currency: p.currency === 'USDT' ? 'USDT' : 'USD' } : {}),
         }));
         (m.incomes || []).forEach(inc => inc && inc.amountUAH > 0 && rows.push({
             type: 'income', date: date(inc.day), title: String(inc.title || ''), amount: inc.amountUAH, category: inc.category || '', card: cardName(inc.cardId), paid: inc.isReceived !== false, from: inc.debtor || '',
@@ -390,14 +404,14 @@ export function applyImport(state, plan) {
     for (const item of plan.items) {
         if (!state.months[item.monthKey]) {
             const [y, m] = item.monthKey.split('-').map(Number);
-            const month = { year: y, month: m, name: `${MONTHS[m - 1]} ${y}`, salaryDay: template.salaryDay || 1, incomeUAH: 0, rate: template.rate || 0, salaryParts: [], incomes: [], expenses: [] };
+            const month = { year: y, month: m, name: `${MONTHS[m - 1]} ${y}`, salaryDay: template.salaryDay || 1, incomeUAH: 0, rate: template.rate || 0, savingsUAH: 0, extraIncomeUAH: 0, salaryParts: [], incomes: [], expenses: [] };
             ensurePresetIncomes(month);
             state.months[item.monthKey] = month;
         }
         const month = state.months[item.monthKey];
         if (item.salary) {
             const part = item.usd
-                ? { id: newId('sal'), amount: item.usd, currency: 'USD', uah: item.amount, day: item.date.d, received: !!item.paid }
+                ? { id: newId('sal'), amount: item.usd, currency: item.currency === 'USDT' ? 'USDT' : 'USD', uah: item.amount, day: item.date.d, received: !!item.paid }
                 : { id: newId('sal'), amount: item.amount, currency: 'UAH', uah: item.amount, day: item.date.d, received: !!item.paid };
             if (item.cardId) part.cardId = item.cardId;
             if (!Array.isArray(month.salaryParts)) month.salaryParts = [];

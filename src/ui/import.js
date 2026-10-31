@@ -1,4 +1,5 @@
-import { analyzeCSV, applyImport, FIELDS, planImport, rowsFromCSV, rowsFromJSON } from '../data/import.js';
+import { analyzeCSV, analyzeTable, applyImport, FIELDS, planImport, rowsFromCSV, rowsFromJSON } from '../data/import.js';
+import { readXLSX } from '../data/xlsx.js';
 import { t } from '../i18n/index.js';
 import { activeMonth, replaceState, state, update } from '../state.js';
 import { esc, money } from './format.js';
@@ -6,6 +7,8 @@ import { exportBackup } from './more.js';
 import { closeSheet, openSheet, toast } from './sheet.js';
 
 const MAX_BYTES = 5 * 1024 * 1024;
+const MAX_XLSX_BYTES = 15 * 1024 * 1024;
+const isXlsx = f => /\.(xlsx|xlsm)$/i.test(f.name);
 let undoSnapshot = null;
 
 export function openImportSheet() {
@@ -14,10 +17,11 @@ export function openImportSheet() {
         <p class="sheet-text">${t('import.hint')}</p>
         <ul class="steps">
             <li>${t('import.csvHint')}</li>
+            <li>${t('import.xlsxHint')}</li>
             <li>${t('import.jsonHint')}</li>
         </ul>
         <div class="actions">
-            <label class="btn primary file-btn">${t('import.choose')}<input id="import-file" type="file" accept=".csv,.json,.txt,text/csv,application/json" multiple hidden></label>
+            <label class="btn primary file-btn">${t('import.choose')}<input id="import-file" type="file" accept=".csv,.xlsx,.xlsm,.json,.txt,text/csv,application/json,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" multiple hidden></label>
             ${undoSnapshot ? `<button class="btn ghost" type="button" data-sheet="undo">${t('import.undo')}</button>` : ''}
         </div>
         <p class="form-error" id="form-error" role="alert" hidden></p>`, { label: t('import.title') });
@@ -30,10 +34,12 @@ export function openImportSheet() {
     sheet.querySelector('#import-file').addEventListener('change', async e => {
         const files = [...e.target.files];
         if (!files.length) return;
-        if (files.some(f => f.size > MAX_BYTES)) return fail(t('import.errSize'));
+        if (files.some(f => f.size > (isXlsx(f) ? MAX_XLSX_BYTES : MAX_BYTES))) return fail(t('import.errSize'));
+        const old = files.find(f => /\.(xls|numbers|ods)$/i.test(f.name));
+        if (old) return fail(t('import.errOldExcel', { file: old.name }));
         let texts;
         try {
-            texts = await Promise.all(files.map(f => f.text()));
+            texts = await Promise.all(files.map(f => (isXlsx(f) ? f.arrayBuffer() : f.text())));
         } catch {
             return fail(t('import.errRead'));
         }
@@ -41,6 +47,22 @@ export function openImportSheet() {
         const sources = [];
         for (const [i, file] of files.entries()) {
             const text = texts[i];
+            if (isXlsx(file)) {
+                let sheets;
+                try {
+                    sheets = await readXLSX(text);
+                } catch {
+                    return fail(t('import.errXlsx', { file: file.name }));
+                }
+                const base = file.name.replace(/\.[^.]+$/, '');
+                const before = sources.length;
+                for (const sh of sheets) {
+                    const a = analyzeTable(sh.rows, [sh.name, base], { defaultDay });
+                    if (a.table.length >= 2) sources.push({ name: sheets.length > 1 ? `${base} · ${sh.name}` : file.name, csv: a });
+                }
+                if (sources.length === before) return fail(t('import.errEmptyIn', { file: file.name }));
+                continue;
+            }
             if (/\.json$/i.test(file.name) || /^\s*[[{]/.test(text)) {
                 let data;
                 try {

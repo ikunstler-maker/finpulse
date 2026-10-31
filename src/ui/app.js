@@ -11,7 +11,8 @@ import {
     createNextMonthFromActive, openBackupSheet, openMonthsSheet, openMoreSheet, openReconcileSheet,
     openDensitySheet, openThemeSheet, selectMonth, stepMonth,
 } from './more.js';
-import { reportsView } from './reports.js';
+import { currentPeriodLabel, reportsView } from './reports.js';
+import { openExportSheet } from './export.js';
 import { notifyOnOpen, openRemindersSheet } from './reminders.js';
 import { closeSheet, sheetOpen } from './sheet.js';
 import { onSyncStatus } from '../sync/controller.js';
@@ -108,6 +109,7 @@ const actions = {
     'new-card': () => openCardSheet(),
     'edit-card': el => openCardSheet(el.dataset.id),
     'open-import': () => openImportSheet(),
+    'open-export': () => openExportSheet(currentPeriodLabel()),
     'open-reminders': () => openRemindersSheet(render),
     'open-backup': () => openBackupSheet(),
     'open-encryption': () => openEncryption(),

@@ -48,7 +48,7 @@ export function createEmptyState(today = new Date(), rate = 41.5) {
     const y = today.getFullYear();
     const m = today.getMonth() + 1;
     const key = `${y}-${String(m).padStart(2, '0')}`;
-    const month = { year: y, month: m, name: monthName(y, m), salaryDay: 1, incomeUAH: 0, rate, salaryParts: [], incomes: [], expenses: [] };
+    const month = { year: y, month: m, name: monthName(y, m), salaryDay: 1, incomeUAH: 0, rate, savingsUAH: 0, extraIncomeUAH: 0, salaryParts: [], incomes: [], expenses: [] };
     ensurePresetIncomes(month);
     return { version: DATA_VERSION, cards: [], activeMonthKey: key, months: { [key]: month } };
 }
