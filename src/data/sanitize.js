@@ -14,6 +14,15 @@ const num = (v, fallback = 0) => {
 };
 const str = v => (v === undefined || v === null ? '' : String(v));
 
+const COLOR = /^#[0-9a-fA-F]{6}$/;
+
+/** cardId лише безпечного вигляду; інакше запис просто без картки. */
+function cleanCardId(out, rec) {
+    if (!('cardId' in rec)) return;
+    if (SAFE_ID.test(str(rec.cardId))) out.cardId = rec.cardId;
+    else delete out.cardId;
+}
+
 let counter = 0;
 const newId = prefix => `${prefix}_${Date.now().toString(36)}${(counter++).toString(36)}`;
 
@@ -29,6 +38,7 @@ function cleanRecord(rec, prefix, fields) {
         if (f in rec && rec[f] !== undefined) out[f] = f === 'isReceived' ? rec[f] !== false : !!rec[f];
     }
     if ('debtor' in rec) out.debtor = str(rec.debtor);
+    cleanCardId(out, rec);
     if ('currency' in rec) out.currency = SAFE_CURRENCY.includes(rec.currency) ? rec.currency : 'USD';
     return out;
 }
@@ -58,6 +68,7 @@ export function sanitizeState(raw) {
                     uah: num(x.uah),
                     day: num(x.day, 1),
                     received: x.received !== false,
+                    ...(SAFE_ID.test(str(x.cardId)) ? { cardId: x.cardId } : {}),
                 }));
         }
         if ('goalMoves' in m) {
@@ -78,6 +89,16 @@ export function sanitizeState(raw) {
     const activeMonthKey = months[raw.activeMonthKey] || keys.length === 0 ? raw.activeMonthKey : keys[keys.length - 1];
     const out = { ...raw, activeMonthKey, months };
     if ('version' in raw) out.version = num(raw.version);
+    if ('cards' in raw) {
+        out.cards = (Array.isArray(raw.cards) ? raw.cards : [])
+            .filter(c => c && typeof c === 'object')
+            .map(c => {
+                const card = { id: SAFE_ID.test(str(c.id)) ? c.id : newId('card'), name: str(c.name).slice(0, 40), color: COLOR.test(str(c.color)) ? c.color : '#5d6b7a' };
+                const last4 = str(c.last4).replace(/\D/g, '').slice(-4);
+                if (last4.length === 4) card.last4 = last4;
+                return card;
+            });
+    }
     if ('goals' in raw) {
         out.goals = (Array.isArray(raw.goals) ? raw.goals : [])
             .filter(g => g && typeof g === 'object')

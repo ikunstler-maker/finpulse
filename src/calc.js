@@ -376,7 +376,7 @@ export function periodOfDay(month, day) {
  * Відбирає й сортує витрати. items — [{ e, month, monthKey, bridge }].
  * status: all | unpaid | overdue | soon | bridge | paid | period1 | period2.
  */
-export function filterExpenses(items, { status = 'all', categories = [], min = null, max = null, search = '', sort = 'date' } = {}, today = new Date()) {
+export function filterExpenses(items, { status = 'all', categories = [], card = 'all', min = null, max = null, search = '', sort = 'date' } = {}, today = new Date()) {
     const q = search.trim().toLowerCase();
     const days = x => Math.round((new Date(x.month.year, x.month.month - 1, x.e.payDay) - new Date(today.getFullYear(), today.getMonth(), today.getDate())) / 86400000);
     const byStatus = {
@@ -391,6 +391,7 @@ export function filterExpenses(items, { status = 'all', categories = [], min = n
     }[status] || (() => true);
     const out = items.filter(x => byStatus(x)
         && (!categories.length || categories.includes(x.e.category))
+        && (card === 'all' || (card === 'none' ? !x.e.cardId : x.e.cardId === card))
         && (min == null || x.e.amountUAH >= min)
         && (max == null || x.e.amountUAH <= max)
         && (!q || x.e.title.toLowerCase().includes(q)));
@@ -402,4 +403,41 @@ export function filterExpenses(items, { status = 'all', categories = [], min = n
         alpha: (a, b) => a.e.title.localeCompare(b.e.title, 'uk'),
     };
     return out.sort(sorters[sort] || sorters.date);
+}
+
+/* ---------- Банківські картки ---------- */
+
+/**
+ * Рух по картці за місяць: сплачено й заплановано витрат, отримано й очікується надходжень
+ * (частини ЗП і статті надходжень). cardId = null — записи без картки.
+ */
+export function cardMonthTotals(month, cardId) {
+    const match = r => (cardId == null ? !r.cardId : r.cardId === cardId);
+    const t = { spent: 0, planned: 0, received: 0, expected: 0, count: 0 };
+    (month.expenses || []).filter(match).forEach(e => {
+        t.count++;
+        if (e.isPaid) t.spent += e.amountUAH || 0;
+        else t.planned += e.amountUAH || 0;
+    });
+    (month.salaryParts || []).filter(match).forEach(p => {
+        t.count++;
+        if (p.received) t.received += p.uah || 0;
+        else t.expected += p.uah || 0;
+    });
+    (month.incomes || []).filter(i => match(i) && (i.amountUAH || 0) > 0).forEach(i => {
+        t.count++;
+        if (i.isReceived !== false) t.received += i.amountUAH;
+        else t.expected += i.amountUAH;
+    });
+    for (const k of ['spent', 'planned', 'received', 'expected']) t[k] = round2(t[k]);
+    return t;
+}
+
+/** Скільки записів у всіх місяцях посилається на картку (перед видаленням). */
+export function cardUsage(state, cardId) {
+    let n = 0;
+    for (const m of Object.values(state.months)) {
+        for (const list of [m.expenses, m.incomes, m.salaryParts]) n += (list || []).filter(r => r.cardId === cardId).length;
+    }
+    return n;
 }

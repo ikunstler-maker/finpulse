@@ -2,7 +2,9 @@ import { getNextMonthKey } from '../calc.js';
 import { t } from '../i18n/index.js';
 import { activeMonth, onStateChange, state } from '../state.js';
 import { budgetView, openExpenseSheet, openFiltersSheet, resetFilters, setBudgetRerender, togglePaid } from './budget.js';
+import { openCardSheet, openCardsSheet } from './cards.js';
 import { openGoalSheet, openGoalsSheet, openMoveSheet } from './goals.js';
+import { openImportSheet } from './import.js';
 import { dayMonth } from './format.js';
 import { incomesView, openIncomeSheet, openPartSheet, openSalaryDaySheet, takeSavingsFromPrevious, toggleIncome, togglePart } from './incomes.js';
 import {
@@ -101,6 +103,10 @@ const actions = {
     'open-reconcile': () => openReconcileSheet(),
     'open-theme': () => openThemeSheet(),
     'open-density': () => openDensitySheet(),
+    'open-cards': () => openCardsSheet(),
+    'new-card': () => openCardSheet(),
+    'edit-card': el => openCardSheet(el.dataset.id),
+    'open-import': () => openImportSheet(),
     'open-backup': () => openBackupSheet(),
     'open-encryption': () => openEncryption(),
     'sync-chip': () => chipAction(),

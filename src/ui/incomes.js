@@ -5,6 +5,7 @@ import { plural, t } from '../i18n/index.js';
 import { activeMonth, state, update } from '../state.js';
 import { currencyFields, readCurrency, wireCurrency } from './currency.js';
 import { dayMonth, esc, foreign, money, monthName, number } from './format.js';
+import { applyCard, cardChip, cardField, readCardField } from './cards.js';
 import { itemRow } from './row.js';
 import { closeSheet, confirmSheet, openSheet, toast } from './sheet.js';
 
@@ -18,6 +19,7 @@ function partRow(p, m) {
     const chips = [
         rate ? `<span class="num">${t('salary.rateShort', { rate: number(rate, 4) })}</span>` : '',
         p.received ? '' : `<span class="chip bridge">${t('incomes.expected')}</span>`,
+        cardChip(p.cardId),
     ].join('');
     return itemRow({
         cls: 'salary-part',
@@ -79,6 +81,7 @@ export function openPartSheet(id = null) {
                 <label for="f-day">${t('salary.partDay', { month: monthName(m.year, m.month) })}</label>
                 <input id="f-day" type="number" inputmode="numeric" min="1" max="31" value="${p.day}">
             </div>
+            ${cardField(p.cardId || '')}
             <div class="toggle"><span id="recv-label">${t('incomes.received')}</span><button type="button" class="switch" role="switch" id="f-received" aria-checked="${!!p.received}" aria-labelledby="recv-label"></button></div>
             <p class="form-error" id="form-error" role="alert" hidden></p>
             <div class="actions">
@@ -111,10 +114,13 @@ export function openPartSheet(id = null) {
         if (!(amt.amount > 0) || !(amt.uah > 0)) return fail(t('salary.errAmount'));
         if (!(day >= 1 && day <= 31)) return fail(t('expense.errDay'));
         const rec = { amount: amt.amount, currency: amt.currency, uah: amt.uah, day, received: sheet.querySelector('#f-received').getAttribute('aria-checked') === 'true' };
+        const cardId = readCardField(sheet);
         update(() => {
             if (!Array.isArray(m.salaryParts)) m.salaryParts = [];
-            if (isNew) m.salaryParts.push({ id: newId('sal'), ...rec });
-            else Object.assign(part, rec);
+            const target = isNew ? { id: newId('sal') } : part;
+            Object.assign(target, rec);
+            applyCard(target, cardId);
+            if (isNew) m.salaryParts.push(target);
         });
         closeSheet();
         toast(t(isNew ? 'toast.partAdded' : 'toast.saved'));
@@ -167,6 +173,7 @@ function incomeRow(i, m, color) {
     const chips = [
         i.debtor ? `<span>${esc(t('incomes.from', { name: i.debtor }))}</span>` : '',
         received ? '' : `<span class="chip bridge">${t('incomes.expected')}</span>`,
+        cardChip(i.cardId),
     ].join('');
     return itemRow({
         cls: 'income-row',
@@ -264,6 +271,7 @@ export function openIncomeSheet(id = null, category = 'extra') {
                 <label for="f-day">${t('incomes.day', { month: monthName(m.year, m.month) })}</label>
                 <input id="f-day" type="number" inputmode="numeric" min="1" max="31" value="${i.day || 1}">
             </div>
+            ${cardField(i.cardId || '')}
             <div class="toggle"><span id="recv-label">${t('incomes.received')}</span><button type="button" class="switch" role="switch" id="f-received" aria-checked="${i.isReceived !== false}" aria-labelledby="recv-label"></button></div>
             <p class="form-error" id="form-error" role="alert" hidden></p>
             <div class="actions">
@@ -314,9 +322,11 @@ export function openIncomeSheet(id = null, category = 'extra') {
             day,
             isReceived: sheet.querySelector('#f-received').getAttribute('aria-checked') === 'true',
         };
+        const cardId = readCardField(sheet);
         update(() => {
             const target = isNew ? { id: newId('inc'), isPreset: false } : income;
             Object.assign(target, rec);
+            applyCard(target, cardId);
             if (amt.currency === 'UAH') {
                 delete target.amountUSD;
                 delete target.currency;

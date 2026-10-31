@@ -165,7 +165,7 @@ test('бекап: збереження і відновлення', async ({ page
     const [download] = await Promise.all([page.waitForEvent('download'), page.locator('[data-sheet="export"]').click()]);
     expect(download.suggestedFilename()).toBe('FinPulse_Backup_2026-10-29.json');
     const exported = JSON.parse(await (await download.createReadStream()).toArray().then(b => Buffer.concat(b).toString('utf8')));
-    expect(exported.version).toBe(4);
+    expect(exported.version).toBe(5);
 
     await page.keyboard.press('Escape');
     await page.evaluate(() => localStorage.clear());
@@ -251,7 +251,7 @@ test('компактний рядок: дата під чекбоксом, бе�
     await expect(r.locator('.check .item-date')).toHaveText('10 жовт');
     await expect(r.locator('.item-title .dot')).toHaveCount(1);
     await expect(r).not.toContainText('Оренда та ЖКГ');
-    await expect(r.locator('.item-meta')).toHaveCount(0); // без позначки «прострочено N дн.»
+    await expect(r).not.toContainText('прострочено'); // без позначки «прострочено N дн.»
     await expect(r).toHaveClass(/overdue/); // дата й рамка червоні
 
     await page.locator('#fab').click();

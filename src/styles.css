@@ -415,3 +415,26 @@ html[data-density="compact"] .big { font-size: clamp(24px, 7vw, 32px); }
 .links { margin: 6px 0 0; font-size: 13px; color: var(--muted); }
 .links a { color: var(--accent); font-weight: 600; }
 .sheet a { color: var(--accent); }
+
+/* Cards */
+.card-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--muted); }
+.card-chip i { width: 10px; height: 7px; border-radius: 2px; display: inline-block; }
+.card-list { display: grid; gap: 6px; margin-bottom: 8px; }
+.card-item {
+    display: grid; gap: 4px; text-align: left; width: 100%; border: 1px solid var(--line); background: var(--surface-2);
+    border-radius: 12px; padding: 10px 12px; min-height: var(--tap);
+}
+.card-item:disabled { cursor: default; opacity: 1; }
+.card-name { display: flex; align-items: center; gap: 8px; }
+.card-name i { width: 18px; height: 12px; border-radius: 3px; display: inline-block; flex: none; }
+.card-totals { display: flex; flex-wrap: wrap; gap: 2px 12px; font-size: 12.5px; color: var(--muted); white-space: normal; }
+.swatches { display: flex; flex-wrap: wrap; gap: 8px; }
+.swatch { width: 36px; height: 36px; border-radius: 10px; border: 3px solid transparent; }
+.swatch[aria-pressed="true"] { border-color: var(--fg); }
+
+/* Import */
+.map-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 10px; }
+.table-wrap { overflow-x: auto; margin-bottom: 10px; border: 1px solid var(--line); border-radius: 10px; }
+.sample { border-collapse: collapse; font-size: 12.5px; width: 100%; }
+.sample th, .sample td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+.sample tr:last-child td { border-bottom: 0; }
