@@ -9,6 +9,7 @@ import { closeSheet, confirmSheet, openSheet, toast } from './sheet.js';
 import { applyCard, cardChip, cardField, cards, cardTitle, readCardField } from './cards.js';
 import { goalsRow } from './goals.js';
 import { demoBanner } from './welcome.js';
+import { reminderBanner } from './reminders.js';
 import { isEncrypted } from '../sync/controller.js';
 import { pickerField, wirePickers } from './picker.js';
 import { itemRow } from './row.js';
@@ -203,6 +204,7 @@ export function budgetView(today = new Date()) {
         <div class="rail">${summaryCard(today)}</div>
         <div class="main-col">
             ${demoBanner()}
+            ${reminderBanner(today)}
             ${m.expenses.length ? toolbar() : ''}
             ${categoryChips(presentCats)}
             ${filterNote}

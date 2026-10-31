@@ -12,6 +12,7 @@ import {
     openDensitySheet, openThemeSheet, selectMonth, stepMonth,
 } from './more.js';
 import { reportsView } from './reports.js';
+import { notifyOnOpen, openRemindersSheet } from './reminders.js';
 import { closeSheet, sheetOpen } from './sheet.js';
 import { onSyncStatus } from '../sync/controller.js';
 import { chipAction, openEncryption, syncChip } from './sync-ui.js';
@@ -107,6 +108,7 @@ const actions = {
     'new-card': () => openCardSheet(),
     'edit-card': el => openCardSheet(el.dataset.id),
     'open-import': () => openImportSheet(),
+    'open-reminders': () => openRemindersSheet(render),
     'open-backup': () => openBackupSheet(),
     'open-encryption': () => openEncryption(),
     'sync-chip': () => chipAction(),
@@ -148,4 +150,5 @@ export function startApp() {
     });
     render();
     if (isFirstRun) openWelcome();
+    else notifyOnOpen();
 }

@@ -50,3 +50,14 @@ self.addEventListener('fetch', event => {
         })),
     );
 });
+
+// Натискання на сповіщення про платежі відкриває застосунок (або переводить на нього фокус).
+self.addEventListener('notificationclick', event => {
+    event.notification.close();
+    event.waitUntil(
+        self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+            const open = list.find(c => c.url.startsWith(self.registration.scope));
+            return open ? open.focus() : self.clients.openWindow(self.registration.scope);
+        }),
+    );
+});
