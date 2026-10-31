@@ -6,6 +6,7 @@ import { activeMonth, state, update } from '../state.js';
 import { currencyFields, readCurrency, wireCurrency } from './currency.js';
 import { dayMonth, esc, foreign, money, monthName, number } from './format.js';
 import { applyCard, cardChip, cardField, readCardField } from './cards.js';
+import { pickerField, wirePickers } from './picker.js';
 import { itemRow } from './row.js';
 import { closeSheet, confirmSheet, openSheet, toast } from './sheet.js';
 
@@ -254,10 +255,7 @@ export function openIncomeSheet(id = null, category = 'extra') {
     const sheet = openSheet(`
         <h3>${isNew ? t('incomes.new') : esc(i.title)}</h3>
         <form id="income-form" novalidate>
-            <div class="field">
-                <label for="f-category">${t('incomes.category')}</label>
-                <select id="f-category">${INCOME_CATEGORIES.map(c => `<option value="${c.id}" ${c.id === i.category ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select>
-            </div>
+            ${pickerField({ id: 'f-category', label: t('incomes.category'), selected: i.category, options: INCOME_CATEGORIES.map(c => ({ value: c.id, label: c.name, color: c.color })) })}
             <div class="field">
                 <label for="f-title">${t('incomes.titleLabel')}</label>
                 <input id="f-title" value="${esc(i.title)}" placeholder="${t('incomes.titlePlaceholder')}" autocomplete="off" maxlength="120">
@@ -281,6 +279,7 @@ export function openIncomeSheet(id = null, category = 'extra') {
         </form>`, { label: isNew ? t('incomes.new') : i.title });
 
     wireCurrency(sheet);
+    wirePickers(sheet);
     sheet.addEventListener('click', ev => {
         if (ev.target.closest('#f-received')) {
             const sw = sheet.querySelector('#f-received');

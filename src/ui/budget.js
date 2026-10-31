@@ -10,6 +10,7 @@ import { applyCard, cardChip, cardField, cards, cardTitle, readCardField } from 
 import { goalsRow } from './goals.js';
 import { demoBanner } from './welcome.js';
 import { isEncrypted } from '../sync/controller.js';
+import { pickerField, wirePickers } from './picker.js';
 import { itemRow } from './row.js';
 import { view } from './view-state.js';
 
@@ -330,10 +331,7 @@ export function openExpenseSheet(monthKey = state.activeMonthKey, id = null) {
                     <label for="f-day">${t('expense.dayShort', { month: t('months.short').split(',')[month.month - 1] })}</label>
                     <input id="f-day" type="number" inputmode="numeric" min="1" max="31" value="${e.payDay}">
                 </div>
-                <div class="field">
-                    <label for="f-category">${t('expense.category')}</label>
-                    <select id="f-category">${CATEGORIES.map(c => `<option value="${c.id}" ${c.id === e.category ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select>
-                </div>
+                ${pickerField({ id: 'f-category', label: t('expense.category'), selected: e.category, options: CATEGORIES.map(c => ({ value: c.id, label: c.name, color: c.color })) })}
             </div>
             ${cardField(e.cardId || '')}
             <div class="toggle"><span id="paid-label">${t('expense.paid')}</span><button type="button" class="switch" role="switch" id="f-paid" aria-checked="${!!e.isPaid}" aria-labelledby="paid-label"></button></div>
@@ -345,6 +343,7 @@ export function openExpenseSheet(monthKey = state.activeMonthKey, id = null) {
         </form>`, { label: isNew ? t('expense.new') : e.title });
 
     wireCurrency(sheet);
+    wirePickers(sheet);
     sheet.addEventListener('click', ev => {
         if (ev.target.closest('#f-paid')) {
             const sw = sheet.querySelector('#f-paid');

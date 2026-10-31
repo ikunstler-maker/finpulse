@@ -40,7 +40,10 @@ test('нова витрата в доларах через панель', async 
     await page.locator('#f-uah').fill('420');
     await expect(page.locator('#f-rate')).toHaveValue('42');
     await page.locator('#f-day').fill('30');
-    await page.locator('#f-category').selectOption('subscriptions');
+    await page.locator('[data-picker="f-category"] .picker-btn').click();
+    await expect(page.locator('[data-picker="f-category"] li[data-value="subscriptions"] .dot')).toHaveCSS('background-color', 'rgb(139, 92, 246)');
+    await page.locator('[data-picker="f-category"] li[data-value="subscriptions"]').click();
+    await expect(page.locator('[data-picker="f-category"] .picker-list')).toBeHidden();
     await page.locator('#expense-form button[type=submit]').click();
     const r = row(page, 'Хостинг');
     await expect(r).toContainText('420,00 ₴');
@@ -279,4 +282,29 @@ test('вікно редагування: по центру, закриваєть
     await page.locator('.sheet-close').click();
     await expect(sheet).toHaveCount(0);
     await expect(page.locator('html')).not.toHaveClass(/modal-open/);
+});
+
+test('верхня панель на всю ширину і напівпрозора; синхронізація ліворуч від місяця; «Ще» з трьома рисочками', async ({ page }) => {
+    await openApp(page);
+    const vp = page.viewportSize();
+    const top = await page.locator('header.top').boundingBox();
+    // на телефоні — від краю до краю; на комп'ютері панель у межах колонки застосунку
+    if (vp.width < 960) {
+        expect(top.x).toBe(0);
+        expect(top.width).toBe(vp.width);
+    }
+    const style = await page.locator('header.top').evaluate(el => {
+        const cs = getComputedStyle(el);
+        return { blur: cs.backdropFilter || cs.webkitBackdropFilter, bg: cs.backgroundColor };
+    });
+    expect(style.blur).toContain('blur');
+    expect(style.bg).toMatch(/rgba\(.*, 0\.\d+\)|color\(srgb .* \/ 0\.\d+\)/);
+    // вміст під панеллю не видно по боках: панель перекриває всю ширину при прокрутці
+    await page.mouse.wheel(0, 600);
+    const after = await page.locator('header.top').boundingBox();
+    expect(after.y).toBe(0);
+    if (vp.width < 960) {
+        await expect(page.locator('.nav [data-action="more"] svg path')).toHaveAttribute('d', 'M4 7h16M4 12h16M4 17h16');
+        await expect(page.locator('header.top .brand')).toBeHidden();
+    }
 });
