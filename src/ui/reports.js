@@ -31,6 +31,12 @@ function bars(list) {
         </div>`).join('');
 }
 
+/** Підпис періоду для файлів звіту. */
+export function currentPeriodLabel() {
+    const data = collectAnalytics(state, { period: view.reportPeriod, from: view.reportFrom, to: view.reportTo });
+    return periodLabel(data.selectedMonths);
+}
+
 export function reportsView() {
     const data = collectAnalytics(state, { period: view.reportPeriod, from: view.reportFrom, to: view.reportTo });
     const paid = data.expenses.filter(e => e.isPaid);
@@ -61,7 +67,10 @@ export function reportsView() {
                 ${PERIODS.map(p => `<button data-action="report-period" data-period="${p}" aria-pressed="${view.reportPeriod === p}">${t(`reports.periods.${p}`)}</button>`).join('')}
             </div>
             ${custom}
-            <p class="period-label" id="report-period-label">${esc(periodLabel(data.selectedMonths))}</p>
+            <div class="period-row">
+                <p class="period-label" id="report-period-label">${esc(periodLabel(data.selectedMonths))}</p>
+                <button class="btn ghost small-btn" data-action="open-export">${t('export.button')}</button>
+            </div>
             <div class="kpis">
                 <div class="kpi"><div class="label">${t('reports.income')}</div><div class="v num" id="report-income">${money0(data.totalIncome)}</div></div>
                 <div class="kpi"><div class="label">${t('reports.paid')}</div><div class="v num" id="report-paid">${money0(paidSum)}</div></div>

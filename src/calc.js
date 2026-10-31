@@ -200,6 +200,23 @@ export function reconcile(month, nextMonth, actualUAH) {
     };
 }
 
+/** Ключі місяців періоду звіту (крім «Свої дати»): поточний, 3 чи 6 до поточного, рік, усі. */
+export function periodMonthKeys(state, period) {
+    const allKeys = Object.keys(state.months).sort();
+    const curIdx = allKeys.indexOf(state.activeMonthKey);
+    const activeIdx = curIdx >= 0 ? curIdx : allKeys.length - 1;
+    if (period === 'current') return [state.activeMonthKey];
+    if (period === '3m' || period === '6m') {
+        const span = period === '3m' ? 3 : 6;
+        return allKeys.slice(Math.max(0, activeIdx - (span - 1)), activeIdx + 1);
+    }
+    if (period === 'year') {
+        const curYear = state.months[state.activeMonthKey]?.year || 2026;
+        return allKeys.filter(k => state.months[k].year === curYear);
+    }
+    return allKeys;
+}
+
 /**
  * Дані для звітів.
  * period: 'custom' (from/to — рядки YYYY-MM-DD), 'current', '3m', '6m', 'year', 'all'.
@@ -255,20 +272,7 @@ export function collectAnalytics(state, { period, from, to }) {
         return { expenses, totalIncome, totalIncomeUSD, selectedMonths, incomeByCategory };
     }
 
-    const curIdx = allKeys.indexOf(state.activeMonthKey);
-    const activeIdx = curIdx >= 0 ? curIdx : allKeys.length - 1;
-    if (period === 'current') {
-        selectedMonths = [state.months[state.activeMonthKey]];
-    } else if (period === '3m' || period === '6m') {
-        const span = period === '3m' ? 3 : 6;
-        const start = Math.max(0, activeIdx - (span - 1));
-        selectedMonths = allKeys.slice(start, activeIdx + 1).map(k => state.months[k]);
-    } else if (period === 'year') {
-        const curYear = state.months[state.activeMonthKey]?.year || 2026;
-        selectedMonths = allKeys.filter(k => state.months[k].year === curYear).map(k => state.months[k]);
-    } else {
-        selectedMonths = allKeys.map(k => state.months[k]);
-    }
+    selectedMonths = periodMonthKeys(state, period).map(k => state.months[k]);
 
     selectedMonths.filter(Boolean).forEach(m => {
         totalIncome += monthIncomeTotal(m);
