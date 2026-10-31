@@ -76,7 +76,7 @@ test('імпорт CSV: колонки вгадано, перегляд, імп�
     await expect(page.locator('#map-amount')).toHaveValue('3');
     await page.locator('#map-next').click();
     await expect(page.locator('#import-summary')).toContainText('Витрат: 2, надходжень: 1');
-    await expect(page.locator('#import-summary')).toContainText('рядки 4');
+    await expect(page.locator('#import-summary')).not.toContainText('помилками'); // рядок без суми — не помилка
     await page.locator('#opt-backup').uncheck();
     await page.locator('#import-apply').click();
     await expect(page.locator('#toast')).toHaveText('Імпортовано записів: 3');
@@ -104,7 +104,7 @@ test('імпорт CSV: без колонки дати — підказка', as
     await openApp(page);
     await chooseFile(page, 'x.csv', 'Щось;Сума\nабв;100');
     await page.locator('#map-next').click();
-    await expect(page.locator('#form-error')).toHaveText('Оберіть колонки для дати і суми');
+    await expect(page.locator('#form-error')).toHaveText('Оберіть колонку суми і колонку дати (або місяць таблиці)');
 });
 
 test('імпорт JSON: список записів з карткою, яку створено автоматично', async ({ page }) => {
@@ -128,4 +128,49 @@ test('імпорт JSON: неправильний файл — зрозуміл�
     await openApp(page);
     await chooseFile(page, 'bad.json', '{"hello": 1}');
     await expect(page.locator('#form-error')).toHaveText('У цьому JSON немає записів, які можна імпортувати');
+});
+
+const sheet = (month, salaryDate) => [
+    ',Підписки,₴,$,Дата',
+    `TRUE,Інтернет,₴\t300.00,,07.${month}`,
+    `FALSE,Хмара,₴\t83.00,US$\t1.99,20.${month}`,
+    'TRUE,Продукти,"₴\t8,000.00",US$\t0.00,5',
+    'FALSE,Фетр,,US$\t0.00,US$\t0.00',
+    ',СУМА ВИТРАТ,"₴\t8,383.00",US$\t1.99,',
+    `,Зарплата,"₴\t50,000.00","US$\t1,200.00",${salaryDate}`,
+    ',ЗАЛИШОК ,"₴\t41,617.00",US$\t0.00,',
+].join('\r\n');
+
+test('імпорт кількох щомісячних таблиць одразу: місяць із назви файлу', async ({ page }) => {
+    await openApp(page, { firstRun: true });
+    await page.locator('[data-welcome="empty"]').click();
+    await openMore(page);
+    await page.locator('[data-action="open-import"]').click();
+    await page.locator('#import-file').setInputFiles([
+        { name: '08.2026-Серпень.csv', mimeType: 'text/csv', buffer: Buffer.from(sheet('08', '04.08')) },
+        { name: '09.2026-Вересень.csv', mimeType: 'text/csv', buffer: Buffer.from(sheet('09', '04.08')) }, // дата ЗП скопійована з серпня
+    ]);
+    await expect(page.locator('.sheet .sheet-text').first()).toHaveText('Файлів: 2');
+    await expect(page.locator('#import-summary')).toContainText('Витрат: 6, надходжень: 0. Частин зарплати: 2.');
+    await expect(page.locator('#import-summary')).toContainText('Разом витрат 16 766,00 ₴');
+    await expect(page.locator('#import-summary')).toContainText('перенесених у місяць таблиці: 1');
+    await page.locator('#opt-backup').uncheck();
+    await page.locator('#import-apply').click();
+    const st = await savedState(page);
+    expect(st.months['2026-08'].expenses.map(e => e.title)).toEqual(['Інтернет', 'Хмара', 'Продукти']);
+    expect(st.months['2026-09'].salaryParts).toMatchObject([{ amount: 1200, currency: 'USD', uah: 50000, day: 4 }]);
+    expect(st.months['2026-08'].expenses.find(e => e.title === 'Хмара')).toMatchObject({ isPaid: false, amountUSD: 1.99, category: 'subscriptions' }); // з розділу «Підписки»
+});
+
+test('імпорт однієї таблиці: місяць можна змінити у вікні колонок', async ({ page }) => {
+    await openApp(page);
+    await openMore(page);
+    await page.locator('[data-action="open-import"]').click();
+    await page.locator('#import-file').setInputFiles({ name: 'table.csv', mimeType: 'text/csv', buffer: Buffer.from(sheet('11', '8')) });
+    await expect(page.locator('#ctx-month')).toHaveValue('');
+    await page.locator('#ctx-month').selectOption('11');
+    await page.locator('#ctx-year').fill('2026');
+    await page.locator('#map-next').click();
+    await expect(page.locator('#import-summary')).toContainText('Витрат: 3');
+    await expect(page.locator('#import-summary')).toContainText('Місяці: 11.2026');
 });
