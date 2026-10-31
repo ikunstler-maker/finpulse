@@ -355,3 +355,20 @@ test('повторювані платежі й розстрочка: позна�
     expect(nov.find(e => e.title === 'Пилосос').installment).toEqual({ current: 2, total: 4 });
     await expect(row(page, 'Пилосос').locator('.chip.installment')).toHaveText('2/4');
 });
+
+test('«можна витрачати на день» і звіт «Звідки гроші»', async ({ page }) => {
+    await openApp(page);
+    // 29.10 → 7.11 включно: 10 днів; вільні 22 206,05 ₴
+    expect(await text(page, '#kpi-daily')).toBe('2 220,60 ₴');
+    await expect(page.locator('.rowline.daily')).toContainText('10 днів');
+    await page.locator('[data-action="next-month"]').click();
+    await expect(page.locator('#kpi-daily')).toHaveCount(0);
+
+    await page.locator('[data-action="prev-month"]').click();
+    await openTab(page, 'reports');
+    const bars = page.locator('#income-bars .hbar');
+    await expect(bars).toHaveCount(2);
+    await expect(bars.first()).toContainText('Зарплата');
+    await expect(bars.first()).toContainText('49 800 ₴');
+    await expect(bars.nth(1)).toContainText('Заощадження');
+});
