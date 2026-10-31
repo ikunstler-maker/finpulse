@@ -23,6 +23,22 @@ function cleanCardId(out, rec) {
     else delete out.cardId;
 }
 
+/** repeat — лише так/ні; розстрочка — цілі числа 1…360, номер не більший за кількість. */
+function cleanRecurrence(e) {
+    if ('repeat' in e) {
+        if (e.repeat) e.repeat = true;
+        else delete e.repeat;
+    }
+    if ('installment' in e) {
+        const i = e.installment;
+        const current = Math.trunc(num(i?.current));
+        const total = Math.trunc(num(i?.total));
+        if (current >= 1 && total >= 1 && total <= 360 && current <= total) e.installment = { current, total };
+        else delete e.installment;
+    }
+    return e;
+}
+
 let counter = 0;
 const newId = prefix => `${prefix}_${Date.now().toString(36)}${(counter++).toString(36)}`;
 
@@ -57,7 +73,8 @@ export function sanitizeState(raw) {
         out.name = str(m.name);
         out.expenses = (Array.isArray(m.expenses) ? m.expenses : [])
             .map(e => cleanRecord(e, 'exp', { defaultCategory: 'other', numbers: ['amountUAH', 'amountUSD', 'payDay'], booleans: ['isPaid'] }))
-            .filter(Boolean);
+            .filter(Boolean)
+            .map(cleanRecurrence);
         if ('salaryParts' in m) {
             out.salaryParts = (Array.isArray(m.salaryParts) ? m.salaryParts : [])
                 .filter(x => x && typeof x === 'object')

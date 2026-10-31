@@ -300,6 +300,9 @@ function rowsFromBackup(data) {
         const date = d => ({ y, m: mo, d: Math.min(Math.max(1, Number(d) || 1), 31) });
         (m.expenses || []).forEach(e => e && e.amountUAH > 0 && rows.push({
             type: 'expense', date: date(e.payDay), title: String(e.title || ''), amount: e.amountUAH, category: e.category || '', card: cardName(e.cardId), paid: !!e.isPaid,
+            // Формат 6+: без позначки — одноразова; старі бекапи — усі щомісячні, як і було.
+            ...((data.version >= 6 ? !e.repeat : 'repeat' in e && !e.repeat) ? { repeat: false } : {}),
+            ...(e.installment ? { installment: e.installment } : {}),
         }));
         (m.incomes || []).forEach(inc => inc && inc.amountUAH > 0 && rows.push({
             type: 'income', date: date(inc.day), title: String(inc.title || ''), amount: inc.amountUAH, category: inc.category || '', card: cardName(inc.cardId), paid: inc.isReceived !== false, from: inc.debtor || '',
@@ -403,6 +406,12 @@ export function applyImport(state, plan) {
             const e = { id: newId('exp'), title: item.title, category: item.category, amountUAH: item.amount, amountUSD: item.usd || 0, payDay: item.date.d, isPaid: !!item.paid };
             if (item.usd) e.currency = 'USD';
             if (item.cardId) e.cardId = item.cardId;
+            // Як і раніше, імпортовані витрати переходять у наступний місяць; розстрочка — з номером платежу.
+            const inst = item.installment;
+            const cur = Math.trunc(Number(inst?.current));
+            const tot = Math.trunc(Number(inst?.total));
+            if (cur >= 1 && tot >= cur && tot <= 360) e.installment = { current: cur, total: tot };
+            else if (item.repeat !== false) e.repeat = true;
             month.expenses.push(e);
         } else {
             const inc = { id: newId('inc'), title: item.title, category: item.category, amountUAH: item.amount, day: item.date.d, isReceived: !!item.paid, isPreset: false, debtor: item.from || '' };

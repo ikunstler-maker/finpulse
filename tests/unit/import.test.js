@@ -134,9 +134,9 @@ describe('картки', () => {
         expect(s.months['2026-10'].expenses[0].cardId).toBeUndefined();
         expect(s.months['2026-10'].expenses[1].cardId).toBe('c1');
     });
-    it('перенесення у формат 5 додає порожній список карток', () => {
+    it('перенесення у новий формат додає порожній список карток', () => {
         const s = migrateState({ months: { '2026-10': { incomeUAH: 0 } } });
-        expect(s).toMatchObject({ version: 5, cards: [] });
+        expect(s).toMatchObject({ version: 6, cards: [] });
     });
 });
 

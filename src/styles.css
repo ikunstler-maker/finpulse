@@ -467,3 +467,4 @@ html[data-density="compact"] .big { font-size: clamp(24px, 7vw, 32px); }
 .picker-list li { min-height: 40px; display: flex; align-items: center; padding: 0 10px; border-radius: 9px; cursor: pointer; font-size: 15px; }
 .picker-list li:hover, .picker-list li:focus { background: var(--surface-2); outline: none; }
 .picker-list li[aria-selected="true"] { font-weight: 800; }
+.chip.installment { background: var(--accent-soft); color: var(--accent); }

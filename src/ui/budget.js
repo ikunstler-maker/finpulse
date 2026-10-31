@@ -84,7 +84,8 @@ function expenseRow(e, m, monthKey, today, { bridge = false, flat = false } = {}
     const c = catOf(e.category);
     const overdue = !e.isPaid && isExpenseOverdue(e, m, today);
     // У групах стан видно із заголовка; у результатах пошуку позначаємо лише «до ЗП».
-    const chips = (flat && bridge && !e.isPaid ? `<span class="chip bridge">${t('budget.bridgeChip')}</span>` : '') + cardChip(e.cardId);
+    const inst = e.installment ? `<span class="chip installment" title="${t('repeat.installmentOf', e.installment)}">${t('repeat.chip', e.installment)}</span>` : '';
+    const chips = (flat && bridge && !e.isPaid ? `<span class="chip bridge">${t('budget.bridgeChip')}</span>` : '') + inst + cardChip(e.cardId);
     return itemRow({
         cls: `expense-row ${e.isPaid ? 'paid' : ''} ${overdue ? 'overdue' : ''}`,
         checked: e.isPaid,
@@ -334,6 +335,7 @@ export function openExpenseSheet(monthKey = state.activeMonthKey, id = null) {
                 ${pickerField({ id: 'f-category', label: t('expense.category'), selected: e.category, options: CATEGORIES.map(c => ({ value: c.id, label: c.name, color: c.color })) })}
             </div>
             ${cardField(e.cardId || '')}
+            ${repeatFields(isNew ? { repeat: false } : e)}
             <div class="toggle"><span id="paid-label">${t('expense.paid')}</span><button type="button" class="switch" role="switch" id="f-paid" aria-checked="${!!e.isPaid}" aria-labelledby="paid-label"></button></div>
             <p class="form-error" id="form-error" role="alert" hidden></p>
             <div class="actions">
@@ -344,6 +346,7 @@ export function openExpenseSheet(monthKey = state.activeMonthKey, id = null) {
 
     wireCurrency(sheet);
     wirePickers(sheet);
+    wireRepeat(sheet);
     sheet.addEventListener('click', ev => {
         if (ev.target.closest('#f-paid')) {
             const sw = sheet.querySelector('#f-paid');
@@ -375,6 +378,8 @@ export function openExpenseSheet(monthKey = state.activeMonthKey, id = null) {
         if (!title) return fail(t('expense.errTitle'));
         if (!(amt.uah > 0)) return fail(t('expense.errAmount'));
         if (!(day >= 1 && day <= 31)) return fail(t('expense.errDay'));
+        const recur = readRepeat(sheet);
+        if (recur.error) return fail(recur.error);
         const rec = {
             title,
             category: sheet.querySelector('#f-category').value,
@@ -389,10 +394,48 @@ export function openExpenseSheet(monthKey = state.activeMonthKey, id = null) {
             const target = isNew ? { id: newId('exp') } : expense;
             Object.assign(target, rec);
             if (!isNew && amt.currency === 'UAH') delete target.currency;
+            delete target.repeat;
+            delete target.installment;
+            Object.assign(target, recur.value);
             applyCard(target, cardId);
             if (isNew) month.expenses.push(target);
         });
         closeSheet();
         toast(t(isNew ? 'toast.expenseAdded' : 'toast.saved'));
     });
+}
+
+/* ---------- Повторення: одноразова, щомісяця, розстрочка ---------- */
+
+function repeatFields(e) {
+    const kind = e.installment ? 'installment' : e.repeat ? 'monthly' : 'once';
+    const inst = e.installment || { current: 1, total: 6 };
+    return `
+        <div class="field">
+            <label for="f-repeat">${t('repeat.label')}</label>
+            <select id="f-repeat">${['once', 'monthly', 'installment'].map(k => `<option value="${k}" ${k === kind ? 'selected' : ''}>${t(`repeat.${k}`)}</option>`).join('')}</select>
+        </div>
+        <div class="field-pair" id="f-installment" ${kind === 'installment' ? '' : 'hidden'}>
+            <div class="field"><label for="f-inst-current">${t('repeat.current')}</label><input id="f-inst-current" type="number" inputmode="numeric" min="1" max="360" value="${inst.current}"></div>
+            <div class="field"><label for="f-inst-total">${t('repeat.total')}</label><input id="f-inst-total" type="number" inputmode="numeric" min="1" max="360" value="${inst.total}"></div>
+        </div>
+        <p class="sheet-text small" id="f-repeat-hint">${t(`repeat.hint_${kind}`)}</p>`;
+}
+
+function wireRepeat(sheet) {
+    const sel = sheet.querySelector('#f-repeat');
+    sel.addEventListener('change', () => {
+        sheet.querySelector('#f-installment').hidden = sel.value !== 'installment';
+        sheet.querySelector('#f-repeat-hint').textContent = t(`repeat.hint_${sel.value}`);
+    });
+}
+
+function readRepeat(sheet) {
+    const kind = sheet.querySelector('#f-repeat').value;
+    if (kind === 'monthly') return { value: { repeat: true } };
+    if (kind !== 'installment') return { value: {} };
+    const current = parseInt(sheet.querySelector('#f-inst-current').value, 10);
+    const total = parseInt(sheet.querySelector('#f-inst-total').value, 10);
+    if (!(total >= 1 && total <= 360 && current >= 1 && current <= total)) return { error: t('repeat.errInstallment') };
+    return { value: { installment: { current, total } } };
 }

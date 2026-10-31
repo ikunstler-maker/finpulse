@@ -168,7 +168,7 @@ test('бекап: збереження і відновлення', async ({ page
     const [download] = await Promise.all([page.waitForEvent('download'), page.locator('[data-sheet="export"]').click()]);
     expect(download.suggestedFilename()).toBe('FinPulse_Backup_2026-10-29.json');
     const exported = JSON.parse(await (await download.createReadStream()).toArray().then(b => Buffer.concat(b).toString('utf8')));
-    expect(exported.version).toBe(5);
+    expect(exported.version).toBe(6);
 
     await page.keyboard.press('Escape');
     await page.evaluate(() => localStorage.clear());
@@ -307,4 +307,51 @@ test('верхня панель на всю ширину і напівпрозо
         await expect(page.locator('.nav [data-action="more"] svg path')).toHaveAttribute('d', 'M4 7h16M4 12h16M4 17h16');
         await expect(page.locator('header.top .brand')).toBeHidden();
     }
+});
+
+test('повторювані платежі й розстрочка: позначка 3/6, у новому місяці — наступний платіж', async ({ page }) => {
+    await openApp(page);
+    await expect(row(page, 'Розстрочка за телефон').locator('.chip.installment')).toHaveText('3/6');
+    // одноразова витрата
+    await page.locator('#fab').click();
+    await page.locator('#f-title').fill('Квіти');
+    await page.locator('#f-amount').fill('300');
+    await expect(page.locator('#f-repeat')).toHaveValue('once');
+    await expect(page.locator('#f-installment')).toBeHidden();
+    await page.locator('#expense-form button[type=submit]').click();
+    // розстрочка з помилкою, потім правильна
+    await page.locator('#fab').click();
+    await page.locator('#f-title').fill('Пилосос');
+    await page.locator('#f-amount').fill('1000');
+    await page.locator('#f-repeat').selectOption('installment');
+    await expect(page.locator('#f-installment')).toBeVisible();
+    await page.locator('#f-inst-current').fill('5');
+    await page.locator('#f-inst-total').fill('4');
+    await page.locator('#expense-form button[type=submit]').click();
+    await expect(page.locator('#form-error')).toContainText('Номер платежу');
+    await page.locator('#f-inst-current').fill('1');
+    await page.locator('#expense-form button[type=submit]').click();
+    await expect(row(page, 'Пилосос').locator('.chip.installment')).toHaveText('1/4');
+    const oct = (await savedState(page)).months['2026-10'].expenses;
+    expect(oct.find(e => e.title === 'Квіти').repeat).toBeUndefined();
+    expect(oct.find(e => e.title === 'Пилосос').installment).toEqual({ current: 1, total: 4 });
+
+    // у демо листопад уже є — прибираємо його і створюємо з жовтня
+    await page.evaluate(() => {
+        const s = JSON.parse(localStorage.getItem('finpulse_app_state_v3'));
+        delete s.months['2026-11'];
+        localStorage.setItem('finpulse_app_state_v3', JSON.stringify(s));
+    });
+    await page.reload();
+    await page.locator('[data-action="next-month"]').click();
+    await page.locator('[data-action="create-next-month"]').click();
+    await expect(page.locator('#cycle-name')).toHaveText('Листопад 2026');
+    const nov = (await savedState(page)).months['2026-11'].expenses;
+    const titles = nov.map(e => e.title);
+    expect(titles).not.toContain('Квіти');
+    expect(titles).not.toContain('Подарунок на день народження');
+    expect(titles).toContain('Оренда квартири');
+    expect(nov.find(e => e.title === 'Розстрочка за телефон').installment).toEqual({ current: 4, total: 6 });
+    expect(nov.find(e => e.title === 'Пилосос').installment).toEqual({ current: 2, total: 4 });
+    await expect(row(page, 'Пилосос').locator('.chip.installment')).toHaveText('2/4');
 });

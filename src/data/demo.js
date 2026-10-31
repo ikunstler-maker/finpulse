@@ -6,7 +6,7 @@ import { ensurePresetIncomes } from './presets.js';
 export function getDefaultInitialState() {
     // Fictional demo data: no real people, amounts or services of the owner.
     const state = {
-        version: 5,
+        version: 6,
         cards: [
             { id: 'card_demo_main', name: 'Основна', color: '#1f6feb' },
             { id: 'card_demo_salary', name: 'Зарплатна', color: '#d9822b', last4: '4821' },
@@ -37,20 +37,20 @@ export function getDefaultInitialState() {
                 ],
                 rate: 41.50,
                 expenses: [
-                    { id: 'exp_1', title: 'Домашній інтернет', category: 'comm', amountUAH: 300.00, amountUSD: 0, payDay: 28, isPaid: false },
-                    { id: 'exp_2', title: 'Мобільний зв\'язок', category: 'comm', amountUAH: 250.00, amountUSD: 0, payDay: 12, isPaid: true },
-                    { id: 'exp_3', title: 'Стрімінговий сервіс', category: 'subscriptions', amountUAH: 331.59, amountUSD: 7.99, payDay: 15, isPaid: false, cardId: 'card_demo_main' },
-                    { id: 'exp_4', title: 'Музичний сервіс', category: 'subscriptions', amountUAH: 248.59, amountUSD: 5.99, payDay: 3, isPaid: false },
-                    { id: 'exp_5', title: 'Хмарне сховище', category: 'subscriptions', amountUAH: 82.59, amountUSD: 1.99, payDay: 6, isPaid: false },
-                    { id: 'exp_6', title: 'Оренда квартири', category: 'housing', amountUAH: 12000.00, amountUSD: 0, payDay: 10, isPaid: false, cardId: 'card_demo_salary' },
-                    { id: 'exp_7', title: 'Комунальні послуги', category: 'housing', amountUAH: 2500.00, amountUSD: 0, payDay: 20, isPaid: false },
-                    { id: 'exp_8', title: 'Продукти', category: 'food', amountUAH: 8000.00, amountUSD: 0, payDay: 9, isPaid: true, cardId: 'card_demo_main' },
-                    { id: 'exp_9', title: 'Стрижка', category: 'beauty', amountUAH: 900.00, amountUSD: 0, payDay: 18, isPaid: false },
-                    { id: 'exp_10', title: 'Спортзал', category: 'health', amountUAH: 1100.00, amountUSD: 0, payDay: 14, isPaid: false },
+                    { id: 'exp_1', title: 'Домашній інтернет', category: 'comm', amountUAH: 300.00, amountUSD: 0, payDay: 28, isPaid: false, repeat: true },
+                    { id: 'exp_2', title: 'Мобільний зв\'язок', category: 'comm', amountUAH: 250.00, amountUSD: 0, payDay: 12, isPaid: true, repeat: true },
+                    { id: 'exp_3', title: 'Стрімінговий сервіс', category: 'subscriptions', amountUAH: 331.59, amountUSD: 7.99, payDay: 15, isPaid: false, cardId: 'card_demo_main', repeat: true },
+                    { id: 'exp_4', title: 'Музичний сервіс', category: 'subscriptions', amountUAH: 248.59, amountUSD: 5.99, payDay: 3, isPaid: false, repeat: true },
+                    { id: 'exp_5', title: 'Хмарне сховище', category: 'subscriptions', amountUAH: 82.59, amountUSD: 1.99, payDay: 6, isPaid: false, repeat: true },
+                    { id: 'exp_6', title: 'Оренда квартири', category: 'housing', amountUAH: 12000.00, amountUSD: 0, payDay: 10, isPaid: false, cardId: 'card_demo_salary', repeat: true },
+                    { id: 'exp_7', title: 'Комунальні послуги', category: 'housing', amountUAH: 2500.00, amountUSD: 0, payDay: 20, isPaid: false, repeat: true },
+                    { id: 'exp_8', title: 'Продукти', category: 'food', amountUAH: 8000.00, amountUSD: 0, payDay: 9, isPaid: true, cardId: 'card_demo_main', repeat: true },
+                    { id: 'exp_9', title: 'Стрижка', category: 'beauty', amountUAH: 900.00, amountUSD: 0, payDay: 18, isPaid: false, repeat: true },
+                    { id: 'exp_10', title: 'Спортзал', category: 'health', amountUAH: 1100.00, amountUSD: 0, payDay: 14, isPaid: false, repeat: true },
                     { id: 'exp_11', title: 'Дрібний ремонт', category: 'home', amountUAH: 1500.00, amountUSD: 0, payDay: 22, isPaid: false },
-                    { id: 'exp_12', title: 'Розстрочка за телефон', category: 'debts', amountUAH: 1250.00, amountUSD: 0, payDay: 11, isPaid: false },
+                    { id: 'exp_12', title: 'Розстрочка за телефон', category: 'debts', amountUAH: 1250.00, amountUSD: 0, payDay: 11, isPaid: false, installment: { current: 3, total: 6 } },
                     { id: 'exp_13', title: 'Подарунок на день народження', category: 'gifts', amountUAH: 800.00, amountUSD: 0, payDay: 25, isPaid: false },
-                    { id: 'exp_14', title: 'Інші дрібні витрати', category: 'other', amountUAH: 1000.00, amountUSD: 0, payDay: 30, isPaid: false }
+                    { id: 'exp_14', title: 'Інші дрібні витрати', category: 'other', amountUAH: 1000.00, amountUSD: 0, payDay: 30, isPaid: false, repeat: true }
                 ]
             },
             '2026-11': {
@@ -69,10 +69,10 @@ export function getDefaultInitialState() {
                 incomes: [],
                 rate: 41.50,
                 expenses: [
-                    { id: 'exp_nov_1', title: 'Музичний сервіс', category: 'subscriptions', amountUAH: 248.59, amountUSD: 5.99, payDay: 3, isPaid: false },
-                    { id: 'exp_nov_2', title: 'Хмарне сховище', category: 'subscriptions', amountUAH: 82.59, amountUSD: 1.99, payDay: 6, isPaid: false },
-                    { id: 'exp_nov_3', title: 'Оренда квартири', category: 'housing', amountUAH: 12000.00, amountUSD: 0, payDay: 10, isPaid: false, cardId: 'card_demo_salary' },
-                    { id: 'exp_nov_4', title: 'Продукти', category: 'food', amountUAH: 8000.00, amountUSD: 0, payDay: 9, isPaid: false, cardId: 'card_demo_main' }
+                    { id: 'exp_nov_1', title: 'Музичний сервіс', category: 'subscriptions', amountUAH: 248.59, amountUSD: 5.99, payDay: 3, isPaid: false, repeat: true },
+                    { id: 'exp_nov_2', title: 'Хмарне сховище', category: 'subscriptions', amountUAH: 82.59, amountUSD: 1.99, payDay: 6, isPaid: false, repeat: true },
+                    { id: 'exp_nov_3', title: 'Оренда квартири', category: 'housing', amountUAH: 12000.00, amountUSD: 0, payDay: 10, isPaid: false, cardId: 'card_demo_salary', repeat: true },
+                    { id: 'exp_nov_4', title: 'Продукти', category: 'food', amountUAH: 8000.00, amountUSD: 0, payDay: 9, isPaid: false, cardId: 'card_demo_main', repeat: true }
                 ]
             }
         }
