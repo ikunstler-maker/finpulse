@@ -441,3 +441,15 @@ export function cardUsage(state, cardId) {
     }
     return n;
 }
+
+/**
+ * Чи переходить витрата в наступний місяць і якою: розстрочка — наступним платежем, доки
+ * не останній; щомісячна — як є; одноразова — ні. Повертає копію полів повторення або null.
+ */
+export function nextRecurrence(expense) {
+    const inst = expense?.installment;
+    if (inst && inst.total > 0) {
+        return inst.current < inst.total ? { installment: { current: inst.current + 1, total: inst.total } } : null;
+    }
+    return expense?.repeat ? { repeat: true } : null;
+}

@@ -61,7 +61,7 @@
 - Інтерфейс: `src/ui/*`. Жодних `onclick` у розмітці — кнопки мають `data-action`,
   обробники в `src/ui/app.js` (діє Content-Security-Policy). Тексти — лише через `t()` зі `src/i18n/uk.js`
   (тест перевіряє, що ключі існують і українських текстів поза словником немає).
-- Формат даних — версія 5 (картки `cards` і `cardId`; `src/data/migrate.js`); імпорт CSV/JSON — `src/data/import.js`; нове поле — з перевіркою в `src/data/sanitize.js` і тестом.
+- Формат даних — версія 6 (картки `cards` і `cardId`; повторення `repeat` / `installment`; `src/data/migrate.js`); імпорт CSV/JSON — `src/data/import.js`; нове поле — з перевіркою в `src/data/sanitize.js` і тестом.
 - Шифрування і синхронізація: `src/sync/` (engine — логіка й конфлікти, controller — режими local/locked/vault,
   local-vault — зашифрована копія і «запам'ятати пристрій»). У режимі vault відкриті дані не пишуться в localStorage.
 

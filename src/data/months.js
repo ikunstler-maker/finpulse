@@ -1,10 +1,11 @@
-import { carryOverBalance, getNextMonthKey } from '../calc.js';
+import { carryOverBalance, getNextMonthKey, nextRecurrence } from '../calc.js';
 import { monthName } from '../ui/format.js';
-import { newId } from './migrate.js';
+import { DATA_VERSION, newId } from './migrate.js';
 import { ensurePresetIncomes } from './presets.js';
 
 /**
- * Створює наступний місяць з поточного: ті самі витрати (не сплачені), ті самі частини ЗП
+ * Створює наступний місяць з поточного: повторювані витрати (щомісячні й розстрочки з наступним
+ * номером платежу; не сплачені; одноразові не переносяться), ті самі частини ЗП
  * (ще не отримані), а заощадженнями стає вільний залишок поточного місяця.
  */
 export function createNextMonth(state, key) {
@@ -12,7 +13,14 @@ export function createNextMonth(state, key) {
     const nextKey = getNextMonthKey(key);
     if (!cur || state.months[nextKey]) return nextKey;
     const [y, m] = nextKey.split('-').map(Number);
-    const expenses = cur.expenses.map(e => ({ ...e, id: newId('exp'), isPaid: false }));
+    const expenses = cur.expenses.flatMap(e => {
+        const rec = nextRecurrence(e);
+        if (!rec) return [];
+        const copy = { ...e, id: newId('exp'), isPaid: false };
+        delete copy.repeat;
+        delete copy.installment;
+        return [{ ...copy, ...rec }];
+    });
     const savings = carryOverBalance(cur, expenses, cur.salaryDay);
     const next = {
         year: y,
@@ -42,5 +50,5 @@ export function createEmptyState(today = new Date(), rate = 41.5) {
     const key = `${y}-${String(m).padStart(2, '0')}`;
     const month = { year: y, month: m, name: monthName(y, m), salaryDay: 1, incomeUAH: 0, rate, salaryParts: [], incomes: [], expenses: [] };
     ensurePresetIncomes(month);
-    return { version: 5, cards: [], activeMonthKey: key, months: { [key]: month } };
+    return { version: DATA_VERSION, cards: [], activeMonthKey: key, months: { [key]: month } };
 }
