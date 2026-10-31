@@ -6,6 +6,7 @@ import { activeMonth, state, update } from '../state.js';
 import { currencyFields, readCurrency, wireCurrency } from './currency.js';
 import { dateOf, dayMonth, dayMonthLong, daysFrom, esc, foreign, money, money0 } from './format.js';
 import { closeSheet, confirmSheet, openSheet, toast } from './sheet.js';
+import { applyCard, cardChip, cardField, cards, cardTitle, readCardField } from './cards.js';
 import { goalsRow } from './goals.js';
 import { demoBanner } from './welcome.js';
 import { isEncrypted } from '../sync/controller.js';
@@ -82,7 +83,7 @@ function expenseRow(e, m, monthKey, today, { bridge = false, flat = false } = {}
     const c = catOf(e.category);
     const overdue = !e.isPaid && isExpenseOverdue(e, m, today);
     // У групах стан видно із заголовка; у результатах пошуку позначаємо лише «до ЗП».
-    const chips = flat && bridge && !e.isPaid ? `<span class="chip bridge">${t('budget.bridgeChip')}</span>` : '';
+    const chips = (flat && bridge && !e.isPaid ? `<span class="chip bridge">${t('budget.bridgeChip')}</span>` : '') + cardChip(e.cardId);
     return itemRow({
         cls: `expense-row ${e.isPaid ? 'paid' : ''} ${overdue ? 'overdue' : ''}`,
         checked: e.isPaid,
@@ -121,8 +122,8 @@ function categoryChips(categoryIds) {
         </div>`;
 }
 
-const flatMode = f => f.status !== 'all' || f.sort !== 'date' || f.search.trim() !== '' || f.min != null || f.max != null || f.categories.length > 1;
-export const activeFilterCount = f => [f.status !== 'all', f.sort !== 'date', f.min != null || f.max != null, f.categories.length > 1].filter(Boolean).length;
+const flatMode = f => f.status !== 'all' || f.sort !== 'date' || f.search.trim() !== '' || f.min != null || f.max != null || f.categories.length > 1 || f.card !== 'all';
+export const activeFilterCount = f => [f.status !== 'all', f.sort !== 'date', f.min != null || f.max != null, f.categories.length > 1, f.card !== 'all'].filter(Boolean).length;
 
 function toolbar() {
     const n = activeFilterCount(view.filter);
@@ -147,6 +148,7 @@ export function budgetView(today = new Date()) {
     const presentCats = [...new Set([...m.expenses, ...bridgeItems].map(e => e.category))]
         .sort((a, b) => CATEGORIES.findIndex(c => c.id === a) - CATEGORIES.findIndex(c => c.id === b));
     f.categories = f.categories.filter(c => presentCats.includes(c));
+    if (f.card !== 'all' && f.card !== 'none' && !cards().some(c => c.id === f.card)) f.card = 'all';
     const inFilter = e => !f.categories.length || f.categories.includes(e.category);
 
     const rows = (list, month, mk, opts) => list.map(e => expenseRow(e, month, mk, today, opts));
@@ -232,6 +234,12 @@ export function openFiltersSheet() {
                     <select id="f-sort">${SORTS.map(s => `<option value="${s}" ${f.sort === s ? 'selected' : ''}>${t(`filters.sorts.${s}`)}</option>`).join('')}</select>
                 </div>
             </div>
+            ${cards().length ? `<div class="field"><label for="f-filter-card">${t('cards.field')}</label>
+                <select id="f-filter-card">
+                    <option value="all" ${f.card === 'all' ? 'selected' : ''}>${t('cards.all')}</option>
+                    ${cards().map(c => `<option value="${c.id}" ${f.card === c.id ? 'selected' : ''}>${esc(cardTitle(c))}</option>`).join('')}
+                    <option value="none" ${f.card === 'none' ? 'selected' : ''}>${t('cards.noCard')}</option>
+                </select></div>` : ''}
             <div class="field-pair">
                 <div class="field"><label for="f-min">${t('filters.min')}</label><input id="f-min" type="number" inputmode="decimal" min="0" value="${f.min ?? ''}"></div>
                 <div class="field"><label for="f-max">${t('filters.max')}</label><input id="f-max" type="number" inputmode="decimal" min="0" value="${f.max ?? ''}"></div>
@@ -264,6 +272,7 @@ export function openFiltersSheet() {
             min: numOrNull(sheet.querySelector('#f-min').value),
             max: numOrNull(sheet.querySelector('#f-max').value),
             categories: [...sheet.querySelectorAll('[data-fcat][aria-pressed="true"]')].map(b => b.dataset.fcat),
+            card: sheet.querySelector('#f-filter-card')?.value || 'all',
         };
         closeSheet();
         rerender();
@@ -276,7 +285,7 @@ export function setBudgetRerender(fn) {
 }
 
 export function resetFilters() {
-    view.filter = { ...view.filter, status: 'all', categories: [], min: null, max: null, search: '', sort: 'date' };
+    view.filter = { ...view.filter, status: 'all', categories: [], card: 'all', min: null, max: null, search: '', sort: 'date' };
     rerender();
 }
 
@@ -326,6 +335,7 @@ export function openExpenseSheet(monthKey = state.activeMonthKey, id = null) {
                     <select id="f-category">${CATEGORIES.map(c => `<option value="${c.id}" ${c.id === e.category ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select>
                 </div>
             </div>
+            ${cardField(e.cardId || '')}
             <div class="toggle"><span id="paid-label">${t('expense.paid')}</span><button type="button" class="switch" role="switch" id="f-paid" aria-checked="${!!e.isPaid}" aria-labelledby="paid-label"></button></div>
             <p class="form-error" id="form-error" role="alert" hidden></p>
             <div class="actions">
@@ -375,12 +385,13 @@ export function openExpenseSheet(monthKey = state.activeMonthKey, id = null) {
             isPaid: sheet.querySelector('#f-paid').getAttribute('aria-checked') === 'true',
         };
         if (amt.currency !== 'UAH') rec.currency = amt.currency;
+        const cardId = readCardField(sheet);
         update(() => {
-            if (isNew) month.expenses.push({ id: newId('exp'), ...rec });
-            else {
-                Object.assign(expense, rec);
-                if (amt.currency === 'UAH') delete expense.currency;
-            }
+            const target = isNew ? { id: newId('exp') } : expense;
+            Object.assign(target, rec);
+            if (!isNew && amt.currency === 'UAH') delete target.currency;
+            applyCard(target, cardId);
+            if (isNew) month.expenses.push(target);
         });
         closeSheet();
         toast(t(isNew ? 'toast.expenseAdded' : 'toast.saved'));

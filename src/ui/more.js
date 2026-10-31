@@ -77,6 +77,8 @@ export function openMoreSheet() {
             <button data-action="open-months"><strong>${t('more.months')}</strong><span>${t('more.monthsSub', { month: esc(m.name) })}</span></button>
             <button data-action="open-theme"><strong>${t('more.theme')}</strong><span>${t(`theme.${getTheme()}`)}</span></button>
             <button data-action="open-density"><strong>${t('more.density')}</strong><span>${t(`density.${getDensity()}`)}</span></button>
+            <button data-action="open-cards"><strong>${t('more.cards')}</strong><span>${(state.cards || []).length ? t('more.cardsSub', { n: state.cards.length }) : t('more.cardsEmpty')}</span></button>
+            <button data-action="open-import"><strong>${t('more.import')}</strong><span>${t('more.importSub')}</span></button>
             <button data-action="open-encryption"><strong>${t('more.encryption')}</strong><span>${t(isEncrypted() ? 'more.encryptionOn' : 'more.encryptionOff')}</span></button>
             <button data-action="open-backup"><strong>${t('more.backup')}</strong><span>${t('more.backupSub')}</span></button>
         </div>

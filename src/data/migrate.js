@@ -2,11 +2,13 @@
  * ВЕРСІЇ ФОРМАТУ ДАНИХ
  * 3 — зарплата одним полем `incomeUAH` (+ `incomeUSDT`, `rate`).
  * 4 — зарплата частинами `salaryParts` (кожен вивід: сума, валюта, гривні, день, отримано).
+ * 5 — банківські картки `cards` ({ id, name, color, last4 }) і необов'язкове `cardId` у витратах,
+ *     надходженнях і частинах ЗП. Старі записи — без картки.
  * Ключ localStorage не змінюється; старі дані й бекапи переносяться при завантаженні.
  */
 import { averageSalaryRate, round2, salaryTotal } from '../calc.js';
 
-export const DATA_VERSION = 4;
+export const DATA_VERSION = 5;
 
 let counter = 0;
 export const newId = prefix => `${prefix}_${Date.now().toString(36)}${(counter++).toString(36)}${Math.random().toString(36).slice(2, 5)}`;
@@ -37,6 +39,7 @@ export function migrateState(state) {
             month.salaryParts = (month.incomeUAH || 0) > 0 ? [legacySalaryPart(month)] : [];
         }
     }
+    if (!Array.isArray(state.cards)) state.cards = [];
     state.version = DATA_VERSION;
     return state;
 }
