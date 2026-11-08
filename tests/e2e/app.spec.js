@@ -68,6 +68,9 @@ test('редагування, дублювання і видалення вит�
     await row(page, 'Спортзал').locator('[data-action="edit-expense"]').click();
     await page.locator('#f-amount').fill('1300');
     await page.locator('#expense-form button[type=submit]').click();
+    // регулярний платіж: питаємо, що змінити
+    await expect(page.locator('.sheet h3')).toHaveText('Змінити регулярний платіж');
+    await page.locator('[data-scope="one"]').click();
     await expect(row(page, 'Спортзал')).toContainText('1 300,00 ₴');
 
     await row(page, 'Спортзал').locator('[data-action="edit-expense"]').click();
@@ -76,7 +79,7 @@ test('редагування, дублювання і видалення вит�
 
     await row(page, 'Спортзал').first().locator('[data-action="edit-expense"]').click();
     await page.locator('[data-sheet="delete"]').click();
-    await page.locator('[data-confirm="yes"]').click();
+    await page.locator('[data-scope="one"], [data-confirm="yes"]').first().click();
     await expect(row(page, 'Спортзал')).toHaveCount(1);
 });
 
@@ -168,7 +171,7 @@ test('бекап: збереження і відновлення', async ({ page
     const [download] = await Promise.all([page.waitForEvent('download'), page.locator('[data-sheet="export"]').click()]);
     expect(download.suggestedFilename()).toBe('FinPulse_Backup_2026-10-29.json');
     const exported = JSON.parse(await (await download.createReadStream()).toArray().then(b => Buffer.concat(b).toString('utf8')));
-    expect(exported.version).toBe(6);
+    expect(exported.version).toBe(7);
 
     await page.keyboard.press('Escape');
     await page.evaluate(() => localStorage.clear());
@@ -319,34 +322,62 @@ test('верхня панель на всю ширину і напівпрозо
     }
 });
 
-test('повторювані платежі й розстрочка: позначка 3/6, у новому місяці — наступний платіж', async ({ page }) => {
+test('регулярні платежі: щотижня, кожні 50 днів, розстрочка; у новому місяці — наступні', async ({ page }) => {
     await openApp(page);
     await expect(row(page, 'Розстрочка за телефон').locator('.chip.installment')).toHaveText('3/6');
-    // одноразова витрата
+    // одноразова — за замовчуванням
     await page.locator('#fab').click();
     await page.locator('#f-title').fill('Квіти');
     await page.locator('#f-amount').fill('300');
     await expect(page.locator('#f-repeat')).toHaveValue('once');
-    await expect(page.locator('#f-installment')).toBeHidden();
+    await expect(page.locator('#f-repeat-more')).toBeHidden();
     await page.locator('#expense-form button[type=submit]').click();
-    // розстрочка з помилкою, потім правильна
+
+    // щотижня з 2 жовтня: у жовтні 5 платежів, підказка з датами
+    await page.locator('#fab').click();
+    await page.locator('#f-title').fill('Кава');
+    await page.locator('#f-amount').fill('60');
+    await page.locator('#f-day').fill('2');
+    await page.locator('#f-repeat').selectOption('week');
+    await expect(page.locator('#f-repeat-hint')).toHaveText('Платежі: 2 жовт, 9 жовт, 16 жовт, 23 жовт…');
+    await page.locator('#expense-form button[type=submit]').click();
+    // 5 у жовтні + 6 листопада в групі «до ЗП»
+    await expect(row(page, 'Кава')).toHaveCount(6);
+    expect((await savedState(page)).months['2026-10'].expenses.filter(e => e.title === 'Кава').map(e => e.payDay)).toEqual([2, 9, 16, 23, 30]);
+
+    // кожні 50 днів
+    await page.locator('#fab').click();
+    await page.locator('#f-title').fill('Фільтр для води');
+    await page.locator('#f-amount').fill('400');
+    await page.locator('#f-day').fill('5');
+    await page.locator('#f-repeat').selectOption('day');
+    await page.locator('#f-every').fill('50');
+    await expect(page.locator('#f-repeat-hint')).toHaveText('Платежі: 5 жовт, 24 лист, 13 січ, 4 бер…');
+    await page.locator('#expense-form button[type=submit]').click();
+
+    // розстрочка: помилка, потім правильно
     await page.locator('#fab').click();
     await page.locator('#f-title').fill('Пилосос');
     await page.locator('#f-amount').fill('1000');
-    await page.locator('#f-repeat').selectOption('installment');
-    await expect(page.locator('#f-installment')).toBeVisible();
+    await page.locator('#f-repeat').selectOption('month');
+    await page.locator('#f-end').selectOption('count');
     await page.locator('#f-inst-current').fill('5');
-    await page.locator('#f-inst-total').fill('4');
+    await page.locator('#f-count').fill('4');
     await page.locator('#expense-form button[type=submit]').click();
     await expect(page.locator('#form-error')).toContainText('Номер платежу');
     await page.locator('#f-inst-current').fill('1');
     await page.locator('#expense-form button[type=submit]').click();
     await expect(row(page, 'Пилосос').locator('.chip.installment')).toHaveText('1/4');
-    const oct = (await savedState(page)).months['2026-10'].expenses;
-    expect(oct.find(e => e.title === 'Квіти').repeat).toBeUndefined();
-    expect(oct.find(e => e.title === 'Пилосос').installment).toEqual({ current: 1, total: 4 });
+    let st = await savedState(page);
+    expect(st.version).toBe(7);
+    expect(st.months['2026-10'].expenses.find(e => e.title === 'Квіти').repeat).toBeUndefined();
+    expect(st.months['2026-10'].expenses.find(e => e.title === 'Пилосос').repeat).toMatchObject({ unit: 'month', every: 1, count: 4 });
 
-    // у демо листопад уже є — прибираємо його і створюємо з жовтня
+    // у демо листопад уже є: щотижнева кава й фільтр додалися і туди
+    expect(st.months['2026-11'].expenses.filter(e => e.title === 'Кава').map(e => e.payDay)).toEqual([6, 13, 20, 27]);
+    expect(st.months['2026-11'].expenses.find(e => e.title === 'Фільтр для води').payDay).toBe(24);
+
+    // прибираємо листопад і створюємо його з жовтня
     await page.evaluate(() => {
         const s = JSON.parse(localStorage.getItem('finpulse_app_state_v3'));
         delete s.months['2026-11'];
@@ -356,14 +387,43 @@ test('повторювані платежі й розстрочка: позна�
     await page.locator('[data-action="next-month"]').click();
     await page.locator('[data-action="create-next-month"]').click();
     await expect(page.locator('#cycle-name')).toHaveText('Листопад 2026');
-    const nov = (await savedState(page)).months['2026-11'].expenses;
-    const titles = nov.map(e => e.title);
-    expect(titles).not.toContain('Квіти');
-    expect(titles).not.toContain('Подарунок на день народження');
-    expect(titles).toContain('Оренда квартири');
+    st = await savedState(page);
+    const nov = st.months['2026-11'].expenses;
+    expect(nov.filter(e => e.title === 'Кава')).toHaveLength(4);
+    expect(nov.some(e => e.title === 'Квіти' || e.title === 'Подарунок на день народження')).toBe(false);
     expect(nov.find(e => e.title === 'Розстрочка за телефон').installment).toEqual({ current: 4, total: 6 });
     expect(nov.find(e => e.title === 'Пилосос').installment).toEqual({ current: 2, total: 4 });
     await expect(row(page, 'Пилосос').locator('.chip.installment')).toHaveText('2/4');
+});
+
+test('регулярний платіж: «цей і всі наступні» — зміна суми і видалення', async ({ page }) => {
+    await openApp(page);
+    await page.locator('#fab').click();
+    await page.locator('#f-title').fill('Кава');
+    await page.locator('#f-amount').fill('60');
+    await page.locator('#f-day').fill('2');
+    await page.locator('#f-repeat').selectOption('week');
+    await page.locator('#expense-form button[type=submit]').click();
+    const edit = async day => {
+        const s = await savedState(page);
+        const id = s.months['2026-10'].expenses.find(e => e.title === 'Кава' && e.payDay === day).id;
+        await page.locator(`[data-action="edit-expense"][data-id="${id}"]`).click();
+    };
+    await edit(16);
+    await page.locator('#f-amount').fill('80');
+    await page.locator('#expense-form button[type=submit]').click();
+    await page.locator('[data-scope="following"]').click();
+    let st = await savedState(page);
+    const kava = m => st.months[m].expenses.filter(e => e.title === 'Кава').map(e => [e.payDay, e.amountUAH]);
+    expect(kava('2026-10')).toEqual([[2, 60], [9, 60], [16, 80], [23, 80], [30, 80]]);
+    expect(kava('2026-11').every(([, a]) => a === 80)).toBe(true);
+
+    await edit(23);
+    await page.locator('[data-sheet="delete"]').click();
+    await page.locator('[data-scope="following"]').click();
+    st = await savedState(page);
+    expect(kava('2026-10').map(([d]) => d)).toEqual([2, 9, 16]);
+    expect(kava('2026-11')).toEqual([]);
 });
 
 test('«можна витрачати на день» і звіт «Звідки гроші»', async ({ page }) => {

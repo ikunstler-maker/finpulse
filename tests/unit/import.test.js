@@ -136,7 +136,7 @@ describe('картки', () => {
     });
     it('перенесення у новий формат додає порожній список карток', () => {
         const s = migrateState({ months: { '2026-10': { incomeUAH: 0 } } });
-        expect(s).toMatchObject({ version: 6, cards: [] });
+        expect(s).toMatchObject({ version: 7, cards: [] });
     });
 });
 
