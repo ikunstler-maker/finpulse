@@ -16,7 +16,7 @@ import { openExportSheet } from './export.js';
 import { notifyOnOpen, openRemindersSheet } from './reminders.js';
 import { closeSheet, sheetOpen } from './sheet.js';
 import { onSyncStatus } from '../sync/controller.js';
-import { chipAction, openEncryption, syncChip } from './sync-ui.js';
+import { openAccount, renderAccountButton } from './sync-ui.js';
 import { demoKeep, demoStartFresh, openWelcome } from './welcome.js';
 import { isFirstRun } from '../state.js';
 import { view } from './view-state.js';
@@ -31,12 +31,7 @@ function cycleRange(m) {
 }
 
 function renderChip() {
-    const chip = $('sync-chip');
-    const c = syncChip();
-    chip.hidden = !c;
-    if (!c) return;
-    chip.textContent = c.text;
-    chip.dataset.state = c.state;
+    renderAccountButton($('account-btn'));
 }
 
 export function render() {
@@ -110,8 +105,7 @@ const actions = {
     'open-export': () => openExportSheet(currentPeriodLabel()),
     'open-reminders': () => openRemindersSheet(render),
     'open-backup': () => openBackupSheet(),
-    'open-encryption': () => openEncryption(),
-    'sync-chip': () => chipAction(),
+    'account': () => openAccount(),
     'demo-start': () => demoStartFresh(),
     'demo-keep': () => demoKeep(),
 };

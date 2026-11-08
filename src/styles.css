@@ -84,9 +84,9 @@ button { cursor: pointer; }
     background: var(--on-accent); box-shadow: 0 -5px 0 var(--on-accent), 0 5px 0 var(--on-accent);
 }
 .cycle { margin-left: auto; display: flex; align-items: center; gap: 2px; min-width: 0; }
-.cycle .sync-chip { margin-right: 4px; }
-.cycle > button:not(.cycle-label) { width: var(--tap); height: var(--tap); border: 0; background: transparent; border-radius: 12px; font-size: 20px; color: var(--muted); }
-.cycle > button:hover, .cycle-label:hover { background: var(--surface-2); }
+.cycle .account-btn { margin-right: 6px; }
+.cycle > button:not(.cycle-label):not(.account-btn) { width: var(--tap); height: var(--tap); border: 0; background: transparent; border-radius: 12px; font-size: 20px; color: var(--muted); }
+.cycle > button:not(.account-btn):hover, .cycle-label:hover { background: var(--surface-2); }
 .cycle-label { border: 0; background: transparent; border-radius: 12px; padding: 4px 6px; text-align: center; min-width: 0; min-height: var(--tap); }
 .cycle-label strong { display: block; font-size: 15px; white-space: nowrap; }
 .cycle-label span { display: block; font-size: 12px; color: var(--muted); white-space: nowrap; }
@@ -353,19 +353,38 @@ html.modal-open, html.modal-open body { overflow: hidden; overscroll-behavior: n
 .rate-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .rate-row .link-btn { min-height: 36px; padding: 4px 2px; }
 
-/* Sync chip in the header */
-.sync-chip {
-    border: 1px solid var(--line); background: color-mix(in srgb, var(--surface) 70%, transparent); color: var(--fg); border-radius: 99px;
-    min-height: 36px; padding: 0 12px; font-size: 12.5px; font-weight: 700; white-space: nowrap; max-width: 34vw;
-    overflow: hidden; text-overflow: ellipsis;
+/* Account: Google icon in the header and the status block */
+.account-btn {
+    position: relative; flex: none; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; padding: 0;
+    border: 1px solid var(--line); background: color-mix(in srgb, var(--surface) 75%, transparent);
 }
-.sync-chip[data-state="action"] { border-color: var(--accent); color: var(--accent); }
-.sync-chip[data-state="error"] { border-color: var(--danger); color: var(--danger); }
-.sync-chip[data-state="ok"] { color: var(--muted); }
+.g-logo { width: 20px; height: 20px; display: block; }
+.account-btn[data-state="guest"] .g-logo, .account-block[data-state="guest"] .g-logo { filter: grayscale(1); opacity: .5; }
+/* Увійшли: кольоровий значок і зелено-блакитна градієнтна обводка */
+.account-btn:not([data-state="guest"]), .account-block:not([data-state="guest"]) .account-icon {
+    border: 2px solid transparent;
+    background: linear-gradient(var(--surface), var(--surface)) padding-box, linear-gradient(135deg, #1fb57a, #19a7d8 55%, #3b82f6) border-box;
+}
+.account-dot { position: absolute; right: -1px; bottom: -1px; width: 11px; height: 11px; border-radius: 50%; border: 2px solid var(--bg); display: none; }
+.account-btn[data-state="pending"] .account-dot { display: block; background: var(--warn); }
+.account-btn[data-state="error"] .account-dot { display: block; background: var(--danger); }
+.account-btn[data-state="busy"] .account-dot { display: block; background: #19a7d8; animation: account-pulse 1s ease-in-out infinite alternate; }
+@keyframes account-pulse { from { opacity: .35; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .account-btn[data-state="busy"] .account-dot { animation: none; } }
+
+.account-block { display: flex; align-items: center; gap: 12px; padding: 10px 12px; margin: 0 0 12px; border-radius: 14px; background: var(--surface-2); border: 1px solid var(--line); }
+.account-icon { flex: none; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: var(--surface); border: 1px solid var(--line); }
+.account-icon .g-logo { width: 22px; height: 22px; }
+.account-text { flex: 1; min-width: 0; display: grid; gap: 1px; }
+.account-text strong { font-size: 15px; }
+.account-text span { font-size: 13px; color: var(--muted); }
+.account-block .btn { flex: none; }
+.google-btn { display: inline-flex; align-items: center; justify-content: center; gap: 10px; background: var(--surface); color: var(--fg); border: 1px solid var(--line); font-weight: 700; }
+.google-btn .g-logo { width: 20px; height: 20px; }
 @media (max-width: 959px) {
     .top .brand { display: none; }
     .cycle { margin-left: 0; width: 100%; justify-content: flex-end; }
-    .cycle .sync-chip { margin-right: auto; }
+    .cycle .account-btn { margin-right: auto; }
 }
 
 /* Lock screen */
