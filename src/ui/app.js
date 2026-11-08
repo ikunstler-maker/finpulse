@@ -11,6 +11,7 @@ import {
     createNextMonthFromActive, openBackupSheet, openMonthsSheet, openMoreSheet, openReconcileSheet,
     selectMonth, stepMonth,
 } from './more.js';
+import { calendarView, openDaySheet, refreshDaySheet } from './calendar.js';
 import { currentPeriodLabel, reportsView } from './reports.js';
 import { openExportSheet } from './export.js';
 import { notifyOnOpen, openRemindersSheet } from './reminders.js';
@@ -44,12 +45,13 @@ export function render() {
         else b.removeAttribute('aria-current');
     });
     const fab = $('fab');
-    fab.hidden = view.tab === 'reports';
+    fab.hidden = view.tab === 'reports' || view.tab === 'calendar';
     $('fab-label').textContent = view.tab === 'incomes' ? t('fab.income') : t('fab.expense');
     const main = $('view');
     const searching = document.activeElement?.id === 'expense-search';
     main.className = `view view-${view.tab}`;
-    main.innerHTML = view.tab === 'budget' ? budgetView() : view.tab === 'incomes' ? incomesView() : reportsView();
+    main.innerHTML = view.tab === 'budget' ? budgetView() : view.tab === 'incomes' ? incomesView() : view.tab === 'calendar' ? calendarView() : reportsView();
+    refreshDaySheet();
     if (searching) {
         const input = $('expense-search');
         input?.focus({ preventScroll: true });
@@ -102,6 +104,7 @@ const actions = {
     'new-card': () => openCardSheet(),
     'edit-card': el => openCardSheet(el.dataset.id),
     'open-import': () => openImportSheet(),
+    'cal-day': el => openDaySheet(Number(el.dataset.day)),
     'open-export': () => openExportSheet(currentPeriodLabel()),
     'open-reminders': () => openRemindersSheet(render),
     'open-backup': () => openBackupSheet(),
