@@ -47,36 +47,51 @@ export function applyDensity(density = getDensity()) {
     else delete document.documentElement.dataset.density;
 }
 
-export function openDensitySheet() {
-    const cur = getDensity();
-    const sheet = openSheet(`
-        <h3>${t('more.density')}</h3>
-        <p class="sheet-text">${t('more.densityHint')}</p>
-        <div class="seg wide" role="group" aria-label="${t('more.density')}">
-            ${['normal', 'compact'].map(k => `<button type="button" data-density-set="${k}" aria-pressed="${k === cur}">${t(`density.${k}`)}</button>`).join('')}
-        </div>
-        <div class="actions"><button class="btn ghost" data-action="close-sheet">${t('common.done')}</button></div>`, { label: t('more.density') });
-    sheet.addEventListener('click', e => {
-        const b = e.target.closest('[data-density-set]');
-        if (!b) return;
-        try {
-            if (b.dataset.densitySet === 'compact') localStorage.setItem(DENSITY_KEY, 'compact');
-            else localStorage.removeItem(DENSITY_KEY);
-        } catch { /* вигляд просто не запам'ятається */ }
-        applyDensity(b.dataset.densitySet);
-        sheet.querySelectorAll('[data-density-set]').forEach(x => x.setAttribute('aria-pressed', x === b));
-    });
+export function setDensity(density) {
+    try {
+        if (density === 'compact') localStorage.setItem(DENSITY_KEY, 'compact');
+        else localStorage.removeItem(DENSITY_KEY);
+    } catch { /* вигляд просто не запам'ятається */ }
+    applyDensity(density);
+}
+
+/* Векторні іконки перемикачів (stroke = колір тексту). */
+const svg = body => `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">${body}</svg>`;
+const ICONS = {
+    light: svg('<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6"/>'),
+    dark: svg('<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/>'),
+    system: svg('<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v17A8.5 8.5 0 0 0 12 3.5z" class="fill"/>'),
+    normal: svg('<rect x="3.5" y="4" width="17" height="6" rx="2"/><rect x="3.5" y="14" width="17" height="6" rx="2"/>'),
+    compact: svg('<rect x="3.5" y="3.5" width="17" height="4" rx="1.4"/><rect x="3.5" y="10" width="17" height="4" rx="1.4"/><rect x="3.5" y="16.5" width="17" height="4" rx="1.4"/>'),
+};
+
+function quickToggles() {
+    const theme = getTheme();
+    const density = getDensity();
+    const btn = (attr, key, cur, label) => `<button type="button" ${attr}="${key}" aria-pressed="${key === cur}" aria-label="${label}" title="${label}">${ICONS[key]}</button>`;
+    return `
+        <div class="quick-row">
+            <div class="quick">
+                <div class="seg icons" role="group" aria-label="${t('more.theme')}">
+                    ${['light', 'dark', 'system'].map(k => btn('data-theme-set', k, theme, t(`theme.${k}`))).join('')}
+                </div>
+            </div>
+            <div class="quick">
+                <div class="seg icons" role="group" aria-label="${t('more.densityShort')}">
+                    ${['normal', 'compact'].map(k => btn('data-density-set', k, density, t(`density.${k}`))).join('')}
+                </div>
+            </div>
+        </div>`;
 }
 
 export function openMoreSheet() {
     const m = activeMonth();
-    openSheet(`
+    const sheet = openSheet(`
         <h3>${t('more.title')}</h3>
+        ${quickToggles()}
         <div class="menu">
             <button data-action="open-reconcile"><strong>${t('more.reconcile')}</strong><span>${t('more.reconcileSub')}</span></button>
             <button data-action="open-months"><strong>${t('more.months')}</strong><span>${t('more.monthsSub', { month: esc(m.name) })}</span></button>
-            <button data-action="open-theme"><strong>${t('more.theme')}</strong><span>${t(`theme.${getTheme()}`)}</span></button>
-            <button data-action="open-density"><strong>${t('more.density')}</strong><span>${t(`density.${getDensity()}`)}</span></button>
             <button data-action="open-reminders"><strong>${t('more.reminders')}</strong><span>${t('reminders.menuSub')}</span></button>
             <button data-action="open-cards"><strong>${t('more.cards')}</strong><span>${(state.cards || []).length ? t('more.cardsSub', { n: state.cards.length }) : t('more.cardsEmpty')}</span></button>
             <button data-action="open-import"><strong>${t('more.import')}</strong><span>${t('more.importSub')}</span></button>
@@ -86,21 +101,14 @@ export function openMoreSheet() {
         <p class="local-note">${t(isEncrypted() ? 'summary.encryptedNote' : 'summary.localNote')}</p>
         <p class="links"><a href="./security.html">${t('links.security')}</a> · <a href="./privacy.html">${t('links.privacy')}</a> · <a href="./terms.html">${t('links.terms')}</a></p>
         <div class="actions"><button class="btn ghost" data-action="close-sheet">${t('common.close')}</button></div>`, { label: t('more.title') });
-}
-
-export function openThemeSheet() {
-    const cur = getTheme();
-    const sheet = openSheet(`
-        <h3>${t('more.theme')}</h3>
-        <div class="seg wide" role="group" aria-label="${t('more.theme')}">
-            ${['system', 'light', 'dark'].map(k => `<button type="button" data-theme-set="${k}" aria-pressed="${k === cur}">${t(`theme.${k}`)}</button>`).join('')}
-        </div>
-        <div class="actions"><button class="btn ghost" data-action="close-sheet">${t('common.done')}</button></div>`, { label: t('more.theme') });
     sheet.addEventListener('click', e => {
-        const b = e.target.closest('[data-theme-set]');
-        if (!b) return;
-        setTheme(b.dataset.themeSet);
-        sheet.querySelectorAll('[data-theme-set]').forEach(x => x.setAttribute('aria-pressed', x === b));
+        const th = e.target.closest('[data-theme-set]');
+        const de = e.target.closest('[data-density-set]');
+        if (th) setTheme(th.dataset.themeSet);
+        if (de) setDensity(de.dataset.densitySet);
+        if (!th && !de) return;
+        const b = th || de;
+        b.parentElement.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b));
     });
 }
 

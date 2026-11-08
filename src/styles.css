@@ -496,3 +496,11 @@ html[data-density="compact"] .big { font-size: clamp(24px, 7vw, 32px); }
     #print-root .num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
     #print-root tr { break-inside: avoid; }
 }
+
+/* Quick toggles in «More»: theme and list density */
+.quick-row { display: flex; gap: 12px; align-items: center; justify-content: space-between; margin: 2px 0 10px; }
+.quick { display: flex; align-items: center; }
+.seg.icons button { flex: none; width: 44px; min-height: 38px; padding: 0; display: grid; place-items: center; color: var(--muted); }
+.seg.icons button[aria-pressed="true"] { color: var(--fg); }
+.seg.icons svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.seg.icons svg .fill { fill: currentColor; stroke: none; }

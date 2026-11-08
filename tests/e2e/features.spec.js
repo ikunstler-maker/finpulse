@@ -126,7 +126,6 @@ test('компактний вигляд: більше записів на екр
     const rowH = async () => (await page.locator('.expense-row').first().boundingBox()).height;
     const normal = await rowH();
     await page.locator('[data-action="more"]:visible').click();
-    await page.locator('[data-action="open-density"]').click();
     await page.locator('[data-density-set="compact"]').click();
     await page.keyboard.press('Escape');
     const compact = await rowH();
