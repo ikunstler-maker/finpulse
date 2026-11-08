@@ -9,7 +9,7 @@ import { dayMonth } from './format.js';
 import { incomesView, openIncomeSheet, openPartSheet, openSalaryDaySheet, takeSavingsFromPrevious, toggleIncome, togglePart } from './incomes.js';
 import {
     createNextMonthFromActive, openBackupSheet, openMonthsSheet, openMoreSheet, openReconcileSheet,
-    openDensitySheet, openThemeSheet, selectMonth, stepMonth,
+    selectMonth, stepMonth,
 } from './more.js';
 import { currentPeriodLabel, reportsView } from './reports.js';
 import { openExportSheet } from './export.js';
@@ -103,8 +103,6 @@ const actions = {
     'select-month': el => selectMonth(el.dataset.month),
     'create-next-month': () => createNextMonthFromActive(),
     'open-reconcile': () => openReconcileSheet(),
-    'open-theme': () => openThemeSheet(),
-    'open-density': () => openDensitySheet(),
     'open-cards': () => openCardsSheet(),
     'new-card': () => openCardSheet(),
     'edit-card': el => openCardSheet(el.dataset.id),

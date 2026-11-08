@@ -220,16 +220,26 @@ test('шкідливий бекап не виконує код і показує
     expect(await page.evaluate(() => window.__pwned)).toBeUndefined();
 });
 
-test('тема: світла, темна, як у системі', async ({ page }) => {
+test('тема: світла, темна, як у системі — іконки в один рядок з виглядом', async ({ page }) => {
     await openApp(page);
     await openMore(page);
-    await page.locator('[data-action="open-theme"]').click();
+    const theme = page.locator('[data-theme-set]');
+    await expect(theme).toHaveCount(3);
+    await expect(page.locator('[data-theme-set="system"]')).toHaveAttribute('aria-pressed', 'true');
+    // векторні іконки, без емодзі; підписи — для читачів екрана
+    await expect(page.locator('.quick-row svg')).toHaveCount(5);
+    await expect(page.locator('[data-theme-set="dark"]')).toHaveAttribute('aria-label', 'Темна');
+    expect(await page.locator('.quick-row').textContent()).not.toMatch(/\p{Extended_Pictographic}/u);
+    // тема і вигляд — в одному рядку
+    const a = await page.locator('[data-theme-set="light"]').boundingBox();
+    const b = await page.locator('[data-density-set="compact"]').boundingBox();
+    expect(Math.abs(a.y - b.y)).toBeLessThan(4);
     await page.locator('[data-theme-set="dark"]').click();
+    await expect(page.locator('[data-theme-set="dark"]')).toHaveAttribute('aria-pressed', 'true');
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
     await page.reload();
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
     await openMore(page);
-    await page.locator('[data-action="open-theme"]').click();
     await page.locator('[data-theme-set="system"]').click();
     await expect(page.locator('html')).not.toHaveAttribute('data-theme', /.+/);
 });
