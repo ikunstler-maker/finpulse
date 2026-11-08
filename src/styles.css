@@ -207,7 +207,7 @@ button { cursor: pointer; }
 /* Bottom nav (phone) */
 .nav {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; background: var(--surface); border-top: 1px solid var(--line);
-    display: grid; grid-template-columns: repeat(4, 1fr);
+    display: grid; grid-template-columns: repeat(5, 1fr);
     padding: 4px max(8px, env(safe-area-inset-right, 0px)) calc(4px + env(safe-area-inset-bottom, 0px)) max(8px, env(safe-area-inset-left, 0px));
 }
 .nav button { min-height: 56px; border: 0; background: transparent; display: grid; place-items: center; gap: 2px; font-size: 12px; font-weight: 700; color: var(--muted); border-radius: 12px; }
@@ -523,3 +523,28 @@ html[data-density="compact"] .big { font-size: clamp(24px, 7vw, 32px); }
 .seg.icons button[aria-pressed="true"] { color: var(--fg); }
 .seg.icons svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .seg.icons svg .fill { fill: currentColor; stroke: none; }
+
+/* Calendar */
+.calendar { max-width: 760px; }
+.cal-head { display: flex; justify-content: space-between; margin: 4px 2px 8px; font-size: 13px; color: var(--muted); font-weight: 600; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.cal-wd { text-align: center; font-size: 12px; font-weight: 700; color: var(--muted); padding: 2px 0 4px; }
+.cal-wd.weekend { color: var(--danger); opacity: .8; }
+.cal-cell {
+    min-height: 64px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); padding: 4px 3px;
+    display: flex; flex-direction: column; align-items: center; gap: 2px; overflow: hidden; min-width: 0; text-align: center;
+}
+.cal-cell.empty { border: 0; background: transparent; }
+.cal-cell.today { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.cal-cell.today .cal-num { color: var(--accent); }
+.cal-cell.payday { background: var(--accent-soft); }
+.cal-num { font-size: 13px; font-weight: 800; line-height: 1.1; }
+.cal-dots { display: flex; flex-wrap: wrap; justify-content: center; gap: 2px; max-width: 100%; }
+.cal-dots i { width: 6px; height: 6px; border-radius: 50%; display: block; }
+.cal-dots i.paid { opacity: .35; }
+.cal-dots i.inc { border-radius: 1px; transform: rotate(45deg); }
+.cal-dots b { font-size: 9px; line-height: 6px; color: var(--muted); }
+.cal-sum { font-size: 10.5px; font-weight: 700; color: var(--fg); white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.cal-sum.in { color: var(--accent); }
+.cal-day-sum { margin: 10px 2px 4px; font-weight: 700; font-size: 14px; }
+@media (min-width: 960px) { .cal-cell { min-height: 84px; } .cal-num { font-size: 15px; } .cal-sum { font-size: 12px; } }

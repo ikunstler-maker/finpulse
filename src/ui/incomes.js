@@ -15,7 +15,7 @@ const visibleIncome = i => !(i.isPreset && !(i.amountUAH > 0));
 
 /* ---------- Зарплата частинами ---------- */
 
-function partRow(p, m) {
+export function partRow(p, m) {
     const rate = partRate(p);
     const chips = [
         rate ? `<span class="num">${t('salary.rateShort', { rate: number(rate, 4) })}</span>` : '',
@@ -169,7 +169,7 @@ export function openSalaryDaySheet() {
 
 /* ---------- Надходження ---------- */
 
-function incomeRow(i, m, color) {
+export function incomeRow(i, m, color) {
     const received = i.isReceived !== false;
     const chips = [
         i.debtor ? `<span>${esc(t('incomes.from', { name: i.debtor }))}</span>` : '',
@@ -244,11 +244,11 @@ export function toggleIncome(id) {
     });
 }
 
-export function openIncomeSheet(id = null, category = 'extra') {
+export function openIncomeSheet(id = null, category = 'extra', { day = null } = {}) {
     const m = activeMonth();
     const income = id ? findIncome(id) : null;
     const isNew = !income;
-    const i = income || { category, title: '', debtor: '', amountUAH: '', day: Math.min(new Date().getDate(), 28), isReceived: true };
+    const i = income || { category, title: '', debtor: '', amountUAH: '', day: day || Math.min(new Date().getDate(), 28), isReceived: true };
     const currency = i.amountUSD > 0 ? i.currency || 'USD' : 'UAH';
     const rate = i.amountUSD > 0 ? Math.round(i.amountUAH / i.amountUSD * 10000) / 10000 : m.rate || DEFAULT_RATE;
 

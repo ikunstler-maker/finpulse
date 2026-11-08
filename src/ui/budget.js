@@ -84,7 +84,7 @@ function periodsBlock() {
 
 /* ---------- Список витрат ---------- */
 
-function expenseRow(e, m, monthKey, today, { bridge = false, flat = false } = {}) {
+export function expenseRow(e, m, monthKey, today, { bridge = false, flat = false } = {}) {
     const c = catOf(e.category);
     const overdue = !e.isPaid && isExpenseOverdue(e, m, today);
     // У групах стан видно із заголовка; у результатах пошуку позначаємо лише «до ЗП».
