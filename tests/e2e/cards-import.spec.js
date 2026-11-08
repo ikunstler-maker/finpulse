@@ -21,6 +21,7 @@ test('картки: додати, вказати у витраті, фільтр
     const cardId = await page.locator('#f-card option', { hasText: 'ПУМБ ·9876' }).getAttribute('value');
     await page.locator('#f-card').selectOption(cardId);
     await page.locator('#expense-form button[type=submit]').click();
+    await page.locator('[data-scope="one"]').click();
     await expect(row(page, 'Спортзал').locator('.card-chip')).toHaveText('ПУМБ');
 
     await page.locator('[data-action="open-filters"]').click();

@@ -491,16 +491,72 @@ export function cardUsage(state, cardId) {
     return n;
 }
 
+/* ---------- Повторення платежів (формат 7) ---------- */
+
+const DAY_MS = 86400000;
+const pad2 = n => String(n).padStart(2, '0');
+export const isoDate = (y, m, d) => `${y}-${pad2(m)}-${pad2(d)}`;
+const daysIn = (y, m) => new Date(Date.UTC(y, m, 0)).getUTCDate();
+const parseIso = s => {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s || ''));
+    return m ? m.slice(1).map(Number) : null;
+};
+
 /**
- * Чи переходить витрата в наступний місяць і якою: розстрочка — наступним платежем, доки
- * не останній; щомісячна — як є; одноразова — ні. Повертає копію полів повторення або null.
+ * Правило повторення: { unit: 'day' | 'week' | 'month' | 'year', every: N, start: 'РРРР-ММ-ДД',
+ * count?: скільки платежів усього, until?: 'РРРР-ММ-ДД' }.
+ * Повертає платежі правила в календарному місяці (y, m): [{ day, index }], index — номер з нуля.
+ * Щомісячні й щорічні — у число дня старту (31-ше в коротшому місяці — останній день).
  */
-export function nextRecurrence(expense) {
-    const inst = expense?.installment;
-    if (inst && inst.total > 0) {
-        return inst.current < inst.total ? { installment: { current: inst.current + 1, total: inst.total } } : null;
+export function ruleOccurrences(rule, y, m) {
+    const start = parseIso(rule?.start);
+    if (!start || !['day', 'week', 'month', 'year'].includes(rule.unit)) return [];
+    const [sy, sm, sd] = start;
+    const every = Math.max(1, Math.trunc(rule.every) || 1);
+    const startT = Date.UTC(sy, sm - 1, sd);
+    const from = Date.UTC(y, m - 1, 1);
+    const to = Date.UTC(y, m - 1, daysIn(y, m));
+    const u = parseIso(rule.until);
+    const untilT = u ? Date.UTC(u[0], u[1] - 1, u[2]) : Infinity;
+    const count = rule.count > 0 ? Math.trunc(rule.count) : Infinity;
+    const out = [];
+    const take = (t, index) => {
+        if (t >= from && t <= to && t >= startT && t <= untilT && index < count) out.push({ day: new Date(t).getUTCDate(), index });
+    };
+    if (rule.unit === 'day' || rule.unit === 'week') {
+        const step = every * (rule.unit === 'week' ? 7 : 1) * DAY_MS;
+        let index = Math.max(0, Math.ceil((from - startT) / step));
+        for (let t = startT + index * step; t <= to && index < count; t += step, index++) take(t, index);
+    } else {
+        const stepM = rule.unit === 'year' ? every * 12 : every;
+        const diff = (y - sy) * 12 + (m - sm);
+        if (diff >= 0 && diff % stepM === 0) take(Date.UTC(y, m - 1, Math.min(sd, daysIn(y, m))), diff / stepM);
     }
-    return expense?.repeat ? { repeat: true } : null;
+    return out;
+}
+
+/** Дата на `k` кроків правила раніше (щоб «платіж №3» мав правильний старт). */
+export function shiftBack(dateIso, unit, every, k) {
+    const p = parseIso(dateIso);
+    if (!p || !(k > 0)) return dateIso;
+    const [y, m, d] = p;
+    const n = Math.max(1, Math.trunc(every) || 1) * k;
+    if (unit === 'day' || unit === 'week') {
+        const t = new Date(Date.UTC(y, m - 1, d) - n * (unit === 'week' ? 7 : 1) * DAY_MS);
+        return isoDate(t.getUTCFullYear(), t.getUTCMonth() + 1, t.getUTCDate());
+    }
+    const months = unit === 'year' ? n * 12 : n;
+    const total = y * 12 + (m - 1) - months;
+    const ny = Math.floor(total / 12);
+    const nm = (total % 12) + 1;
+    return isoDate(ny, nm, Math.min(d, daysIn(ny, nm)));
+}
+
+/** День перед датою (для «припинити серію з цього платежу»). */
+export function dayBefore(dateIso) {
+    const [y, m, d] = parseIso(dateIso);
+    const t = new Date(Date.UTC(y, m - 1, d) - DAY_MS);
+    return isoDate(t.getUTCFullYear(), t.getUTCMonth() + 1, t.getUTCDate());
 }
 
 /**

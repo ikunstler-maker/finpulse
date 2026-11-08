@@ -23,17 +23,36 @@ function cleanCardId(out, rec) {
     else delete out.cardId;
 }
 
-/** repeat — лише так/ні; розстрочка — цілі числа 1…360, номер не більший за кількість. */
+const ISO = /^\d{4}-\d{2}-\d{2}$/;
+const UNITS = ['day', 'week', 'month', 'year'];
+
+/** Правило повторення формату 7 або null. */
+export function cleanRule(r) {
+    if (!r || typeof r !== 'object' || !UNITS.includes(r.unit) || !ISO.test(str(r.start))) return null;
+    const every = Math.trunc(num(r.every, 1));
+    const out = { unit: r.unit, every: every >= 1 && every <= 400 ? every : 1, start: r.start };
+    const count = Math.trunc(num(r.count));
+    if (count >= 1 && count <= 1000) out.count = count;
+    if (ISO.test(str(r.until))) out.until = r.until;
+    return out;
+}
+
+/**
+ * repeat: true (старий формат, переноситься міграцією) або правило; seriesId — безпечний id;
+ * розстрочка — цілі числа 1…1000, номер не більший за кількість.
+ */
 function cleanRecurrence(e) {
     if ('repeat' in e) {
-        if (e.repeat) e.repeat = true;
+        const rule = e.repeat === true ? true : cleanRule(e.repeat);
+        if (rule) e.repeat = rule;
         else delete e.repeat;
     }
+    if ('seriesId' in e && !SAFE_ID.test(str(e.seriesId))) delete e.seriesId;
     if ('installment' in e) {
         const i = e.installment;
         const current = Math.trunc(num(i?.current));
         const total = Math.trunc(num(i?.total));
-        if (current >= 1 && total >= 1 && total <= 360 && current <= total) e.installment = { current, total };
+        if (current >= 1 && total >= 1 && total <= 1000 && current <= total) e.installment = { current, total };
         else delete e.installment;
     }
     return e;

@@ -1,6 +1,7 @@
-import { categorySummary, computeMonthSummary, dailyAllowance, DEFAULT_RATE, filterExpenses, getNextMonthKey, isExpenseOverdue, payPeriods, salaryTotal } from '../calc.js';
+import { categorySummary, computeMonthSummary, dailyAllowance, DEFAULT_RATE, isoDate, ruleOccurrences, shiftBack, filterExpenses, getNextMonthKey, isExpenseOverdue, payPeriods, salaryTotal } from '../calc.js';
 import { CATEGORIES } from '../data/categories.js';
 import { newId } from '../data/migrate.js';
+import { applyFromHere, cutSeries, expenseDate } from '../data/series.js';
 import { plural, t } from '../i18n/index.js';
 import { activeMonth, state, update } from '../state.js';
 import { currencyFields, readCurrency, wireCurrency } from './currency.js';
@@ -315,11 +316,11 @@ export function togglePaid(monthKey, id) {
     if (title) toast(t(paid ? 'toast.paid' : 'toast.unpaid', { title }));
 }
 
-export function openExpenseSheet(monthKey = state.activeMonthKey, id = null) {
+export function openExpenseSheet(monthKey = state.activeMonthKey, id = null, { day = null } = {}) {
     const { month, expense } = id ? findExpense(monthKey, id) : { month: state.months[monthKey] };
     if (!month) return;
     const isNew = !expense;
-    const e = expense || { title: '', category: view.filter.categories.length === 1 ? view.filter.categories[0] : 'other', amountUAH: '', payDay: Math.min(new Date().getDate(), 28), isPaid: false };
+    const e = expense || { title: '', category: view.filter.categories.length === 1 ? view.filter.categories[0] : 'other', amountUAH: '', payDay: day || Math.min(new Date().getDate(), 28), isPaid: false };
     const currency = e.amountUSD > 0 ? e.currency || 'USD' : 'UAH';
     const rate = e.amountUSD > 0 ? Math.round(e.amountUAH / e.amountUSD * 10000) / 10000 : month.rate || DEFAULT_RATE;
 
@@ -339,7 +340,7 @@ export function openExpenseSheet(monthKey = state.activeMonthKey, id = null) {
                 ${pickerField({ id: 'f-category', label: t('expense.category'), selected: e.category, options: CATEGORIES.map(c => ({ value: c.id, label: c.name, color: c.color })) })}
             </div>
             ${cardField(e.cardId || '')}
-            ${repeatFields(isNew ? { repeat: false } : e)}
+            ${repeatFields(isNew ? {} : e)}
             <div class="toggle"><span id="paid-label">${t('expense.paid')}</span><button type="button" class="switch" role="switch" id="f-paid" aria-checked="${!!e.isPaid}" aria-labelledby="paid-label"></button></div>
             <p class="form-error" id="form-error" role="alert" hidden></p>
             <div class="actions">
@@ -350,7 +351,7 @@ export function openExpenseSheet(monthKey = state.activeMonthKey, id = null) {
 
     wireCurrency(sheet);
     wirePickers(sheet);
-    wireRepeat(sheet);
+    wireRepeat(sheet, month);
     sheet.addEventListener('click', ev => {
         if (ev.target.closest('#f-paid')) {
             const sw = sheet.querySelector('#f-paid');
@@ -358,11 +359,29 @@ export function openExpenseSheet(monthKey = state.activeMonthKey, id = null) {
         }
         const act = ev.target.closest('[data-sheet]')?.dataset.sheet;
         if (act === 'duplicate') {
-            update(() => { month.expenses.push({ ...expense, id: newId('exp'), isPaid: false }); });
+            update(() => {
+                const copy = { ...expense, id: newId('exp'), isPaid: false };
+                delete copy.repeat;
+                delete copy.seriesId;
+                delete copy.installment;
+                month.expenses.push(copy);
+            });
             closeSheet();
             toast(t('toast.duplicated', { title: expense.title }));
         }
         if (act === 'delete') {
+            if (expense.seriesId) {
+                chooseScope({ title: t('expense.deleteTitle'), text: t('repeat.deleteSeriesText', { title: esc(expense.title) }), one: t('repeat.deleteOne'), following: t('repeat.deleteFollowing') })
+                    .then(scope => {
+                        if (!scope) return;
+                        update(s => {
+                            if (scope === 'following') cutSeries(s, expense.seriesId, expenseDate(month, expense), expense.id);
+                            month.expenses = month.expenses.filter(x => x.id !== expense.id);
+                        });
+                        toast(t('toast.expenseDeleted'));
+                    });
+                return;
+            }
             confirmSheet({ title: t('expense.deleteTitle'), text: t('expense.deleteText', { title: esc(expense.title) }), confirm: t('common.delete') })
                 .then(ok => {
                     if (!ok) return;
@@ -382,7 +401,7 @@ export function openExpenseSheet(monthKey = state.activeMonthKey, id = null) {
         if (!title) return fail(t('expense.errTitle'));
         if (!(amt.uah > 0)) return fail(t('expense.errAmount'));
         if (!(day >= 1 && day <= 31)) return fail(t('expense.errDay'));
-        const recur = readRepeat(sheet);
+        const recur = readRepeat(sheet, month, day);
         if (recur.error) return fail(recur.error);
         const rec = {
             title,
@@ -394,52 +413,155 @@ export function openExpenseSheet(monthKey = state.activeMonthKey, id = null) {
         };
         if (amt.currency !== 'UAH') rec.currency = amt.currency;
         const cardId = readCardField(sheet);
-        update(() => {
-            const target = isNew ? { id: newId('exp') } : expense;
-            Object.assign(target, rec);
-            if (!isNew && amt.currency === 'UAH') delete target.currency;
-            delete target.repeat;
-            delete target.installment;
-            Object.assign(target, recur.value);
-            applyCard(target, cardId);
-            if (isNew) month.expenses.push(target);
-        });
-        closeSheet();
-        toast(t(isNew ? 'toast.expenseAdded' : 'toast.saved'));
+        // та сама частота, кінець і номер платежу — правило серії не змінилося (старт лишається її власний)
+        const rule = expense && sameShape(expense, recur.rule, sheet) ? expense.repeat : recur.rule;
+        const save = scope => {
+            update(s => {
+                const target = isNew ? { id: newId('exp') } : expense;
+                Object.assign(target, rec);
+                if (!isNew && amt.currency === 'UAH') delete target.currency;
+                applyCard(target, cardId);
+                if (isNew) month.expenses.push(target);
+                if (scope === 'one') return;
+                // нова серія чи зміна правила/полів «з цього платежу»: попередні платежі не змінюються
+                if (rule || target.seriesId) applyFromHere(s, monthKey, target, rule);
+            });
+            closeSheet();
+            toast(t(isNew ? 'toast.expenseAdded' : 'toast.saved'));
+        };
+        const ruleChanged = !sameRule(expense?.repeat, rule);
+        if (isNew || !expense.seriesId) return save(rule ? 'following' : 'one');
+        if (ruleChanged) return save('following');
+        const before = JSON.stringify([expense.title, expense.category, expense.amountUAH, expense.amountUSD || 0, expense.currency || '', expense.cardId || '', expense.payDay]);
+        const after = JSON.stringify([rec.title, rec.category, rec.amountUAH, rec.amountUSD || 0, rec.currency || '', cardId || '', rec.payDay]);
+        if (before === after) return save('one');
+        chooseScope({ title: t('repeat.scopeTitle'), text: t('repeat.scopeText'), one: t('repeat.scopeOne'), following: t('repeat.scopeFollowing') })
+            .then(scope => { if (scope) save(scope); });
     });
 }
 
-/* ---------- Повторення: одноразова, щомісяця, розстрочка ---------- */
+/** «Лише цей платіж» чи «цей і всі наступні»; null — скасовано. */
+function chooseScope({ title, text, one, following }) {
+    return new Promise(resolve => {
+        const sheet = openSheet(`
+            <h3>${title}</h3>
+            <p class="sheet-text">${text}</p>
+            <div class="actions">
+                <button class="btn primary" data-scope="following">${following}</button>
+                <button class="btn ghost" data-scope="one">${one}</button>
+                <button class="btn ghost" data-scope="cancel">${t('common.cancel')}</button>
+            </div>`, { label: title });
+        sheet.addEventListener('click', e => {
+            const b = e.target.closest('[data-scope]');
+            if (!b) return;
+            closeSheet();
+            resolve(b.dataset.scope === 'cancel' ? null : b.dataset.scope);
+        });
+    });
+}
+
+/** Чи форма лишила правило серії як було (частота, кінець, номер платежу). */
+function sameShape(expense, rule, sheet) {
+    const r = expense.repeat;
+    if (!r || typeof r !== 'object' || !rule) return false;
+    if (r.unit !== rule.unit || r.every !== rule.every || (r.count || 0) !== (rule.count || 0) || (r.until || '') !== (rule.until || '')) return false;
+    return !rule.count || Number(sheet.querySelector('#f-inst-current').value) === (expense.installment?.current || 1);
+}
+
+const sameRule = (a, b) => {
+    const norm = r => (r && typeof r === 'object' ? JSON.stringify([r.unit, r.every, r.start, r.count || 0, r.until || '']) : '');
+    return norm(a) === norm(b);
+};
+
+/* ---------- Повторення: правило серії ---------- */
+
+const UNITS = ['once', 'week', 'day', 'month', 'year'];
+const DEFAULT_EVERY = { week: 1, day: 30, month: 1, year: 1 };
 
 function repeatFields(e) {
-    const kind = e.installment ? 'installment' : e.repeat ? 'monthly' : 'once';
-    const inst = e.installment || { current: 1, total: 6 };
+    const r = e.repeat && typeof e.repeat === 'object' ? e.repeat : null;
+    const unit = r ? r.unit : 'once';
+    const end = r?.count ? 'count' : r?.until ? 'until' : 'never';
+    const current = e.installment?.current || 1;
     return `
         <div class="field">
             <label for="f-repeat">${t('repeat.label')}</label>
-            <select id="f-repeat">${['once', 'monthly', 'installment'].map(k => `<option value="${k}" ${k === kind ? 'selected' : ''}>${t(`repeat.${k}`)}</option>`).join('')}</select>
+            <select id="f-repeat">${UNITS.map(k => `<option value="${k}" ${k === unit ? 'selected' : ''}>${t(`repeat.unit.${k}`)}</option>`).join('')}</select>
         </div>
-        <div class="field-pair" id="f-installment" ${kind === 'installment' ? '' : 'hidden'}>
-            <div class="field"><label for="f-inst-current">${t('repeat.current')}</label><input id="f-inst-current" type="number" inputmode="numeric" min="1" max="360" value="${inst.current}"></div>
-            <div class="field"><label for="f-inst-total">${t('repeat.total')}</label><input id="f-inst-total" type="number" inputmode="numeric" min="1" max="360" value="${inst.total}"></div>
+        <div id="f-repeat-more" ${r ? '' : 'hidden'}>
+            <div class="field-pair">
+                <div class="field"><label for="f-every" id="f-every-label">${t(`repeat.every.${r ? unit : 'week'}`)}</label><input id="f-every" type="number" inputmode="numeric" min="1" max="400" value="${r?.every || 1}"></div>
+                <div class="field"><label for="f-end">${t('repeat.end')}</label>
+                    <select id="f-end">${['never', 'count', 'until'].map(k => `<option value="${k}" ${k === end ? 'selected' : ''}>${t(`repeat.ends.${k}`)}</option>`).join('')}</select></div>
+            </div>
+            <div class="field-pair" id="f-count-row" ${end === 'count' ? '' : 'hidden'}>
+                <div class="field"><label for="f-inst-current">${t('repeat.current')}</label><input id="f-inst-current" type="number" inputmode="numeric" min="1" max="1000" value="${current}"></div>
+                <div class="field"><label for="f-count">${t('repeat.total')}</label><input id="f-count" type="number" inputmode="numeric" min="1" max="1000" value="${r?.count || 6}"></div>
+            </div>
+            <div class="field" id="f-until-row" ${end === 'until' ? '' : 'hidden'}><label for="f-until">${t('repeat.untilLabel')}</label><input id="f-until" type="date" value="${r?.until || ''}"></div>
         </div>
-        <p class="sheet-text small" id="f-repeat-hint">${t(`repeat.hint_${kind}`)}</p>`;
+        <p class="sheet-text small" id="f-repeat-hint" aria-live="polite"></p>`;
 }
 
-function wireRepeat(sheet) {
-    const sel = sheet.querySelector('#f-repeat');
-    sel.addEventListener('change', () => {
-        sheet.querySelector('#f-installment').hidden = sel.value !== 'installment';
-        sheet.querySelector('#f-repeat-hint').textContent = t(`repeat.hint_${sel.value}`);
+/** Підказка з найближчими датами платежів за правилом. */
+function nextDates(rule, month, day) {
+    const from = isoDate(month.year, month.month, day);
+    const out = [];
+    for (let i = 0, y = month.year, m = month.month; i < 14 && out.length < 4; i++) {
+        for (const o of ruleOccurrences(rule, y, m)) {
+            if (isoDate(y, m, o.day) >= from && out.length < 4) out.push(dayMonth(m, o.day));
+        }
+        m += 1;
+        if (m > 12) { m = 1; y += 1; }
+    }
+    return out;
+}
+
+function wireRepeat(sheet, month) {
+    const $ = s => sheet.querySelector(s);
+    const refresh = () => {
+        const unit = $('#f-repeat').value;
+        $('#f-repeat-more').hidden = unit === 'once';
+        if (unit !== 'once') $('#f-every-label').textContent = t(`repeat.every.${unit}`);
+        $('#f-count-row').hidden = $('#f-end').value !== 'count';
+        $('#f-until-row').hidden = $('#f-end').value !== 'until';
+        const day = parseInt($('#f-day').value, 10);
+        const r = unit === 'once' || !(day >= 1 && day <= 31) ? null : readRepeat(sheet, month, day);
+        $('#f-repeat-hint').textContent = unit === 'once' ? t('repeat.hint_once')
+            : r?.error ? r.error
+                : r?.rule ? (nextDates(r.rule, month, day).length ? t('repeat.nextDates', { list: nextDates(r.rule, month, day).join(', ') }) : t('repeat.noDates')) : '';
+    };
+    $('#f-repeat').addEventListener('change', () => {
+        const unit = $('#f-repeat').value;
+        if (unit !== 'once') $('#f-every').value = DEFAULT_EVERY[unit];
+        refresh();
     });
+    sheet.addEventListener('input', e => { if (['f-every', 'f-inst-current', 'f-count', 'f-until', 'f-day', 'f-end'].includes(e.target.id)) refresh(); });
+    $('#f-end').addEventListener('change', refresh);
+    refresh();
 }
 
-function readRepeat(sheet) {
-    const kind = sheet.querySelector('#f-repeat').value;
-    if (kind === 'monthly') return { value: { repeat: true } };
-    if (kind !== 'installment') return { value: {} };
-    const current = parseInt(sheet.querySelector('#f-inst-current').value, 10);
-    const total = parseInt(sheet.querySelector('#f-inst-total').value, 10);
-    if (!(total >= 1 && total <= 360 && current >= 1 && current <= total)) return { error: t('repeat.errInstallment') };
-    return { value: { installment: { current, total } } };
+/** Правило з форми; старт — дата цього платежу (для «платіж №k» — на k−1 кроків раніше). */
+function readRepeat(sheet, month, day) {
+    const $ = s => sheet.querySelector(s);
+    const unit = $('#f-repeat').value;
+    if (unit === 'once') return { rule: null };
+    const every = parseInt($('#f-every').value, 10);
+    if (!(every >= 1 && every <= 400)) return { error: t('repeat.errEvery') };
+    const date = isoDate(month.year, month.month, Math.min(day, new Date(month.year, month.month, 0).getDate()));
+    const rule = { unit, every, start: date };
+    const end = $('#f-end').value;
+    if (end === 'count') {
+        const current = parseInt($('#f-inst-current').value, 10);
+        const count = parseInt($('#f-count').value, 10);
+        if (!(count >= 1 && count <= 1000 && current >= 1 && current <= count)) return { error: t('repeat.errInstallment') };
+        rule.count = count;
+        rule.start = shiftBack(date, unit, every, current - 1);
+    }
+    if (end === 'until') {
+        const until = $('#f-until').value;
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(until) || until < date) return { error: t('repeat.errUntil') };
+        rule.until = until;
+    }
+    return { rule };
 }

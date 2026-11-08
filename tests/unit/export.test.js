@@ -53,7 +53,7 @@ describe('формати', () => {
     it('JSON відкривається імпортом: дублікатів у тих самих даних немає, у порожньому — усе', () => {
         const st = demo();
         const json = JSON.parse(toJSON(st, data(), { period: 'current' }));
-        expect(json).toMatchObject({ app: 'FinPulse', kind: 'report', version: 6 });
+        expect(json).toMatchObject({ app: 'FinPulse', kind: 'report', version: 7 });
         expect(json.months['2026-10'].salaryParts).toHaveLength(2);
         expect(json.cards.map(c => c.name).sort()).toEqual(['Зарплатна', 'Основна']);
         const rows = rowsFromJSON(json).rows;

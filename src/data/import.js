@@ -6,7 +6,9 @@
  * Усе — у браузері, без мережі.
  */
 import { CATEGORIES, INCOME_CATEGORIES } from './categories.js';
+import { isoDate, shiftBack } from '../calc.js';
 import { newId } from './migrate.js';
+import { cleanRule } from './sanitize.js';
 import { ensurePresetIncomes } from './presets.js';
 
 const MONTHS = 'Січень,Лютий,Березень,Квітень,Травень,Червень,Липень,Серпень,Вересень,Жовтень,Листопад,Грудень'.split(',');
@@ -312,6 +314,7 @@ function rowsFromBackup(data) {
             // Формат 6+: без позначки — одноразова; старі бекапи — усі щомісячні, як і було.
             ...((data.version >= 6 ? !e.repeat : 'repeat' in e && !e.repeat) ? { repeat: false } : {}),
             ...(e.installment ? { installment: e.installment } : {}),
+            ...(e.repeat && typeof e.repeat === 'object' ? { rule: e.repeat, seriesId: e.seriesId } : {}),
         }));
         // Частини зарплати — як рядки «зарплата» (імпорт створить частини ЗП).
         (Array.isArray(m.salaryParts) ? m.salaryParts : []).forEach(p => p && p.uah > 0 && rows.push({
@@ -401,6 +404,8 @@ export function applyImport(state, plan) {
     if (!Array.isArray(state.cards)) state.cards = [];
     plan.newCards.forEach((c, i) => state.cards.push({ ...c, color: CARD_COLORS[(state.cards.length + i) % CARD_COLORS.length] }));
     const template = state.months[state.activeMonthKey] || {};
+    const seriesIds = new Map();
+    const seen = new Map();
     for (const item of plan.items) {
         if (!state.months[item.monthKey]) {
             const [y, m] = item.monthKey.split('-').map(Number);
@@ -420,12 +425,25 @@ export function applyImport(state, plan) {
             const e = { id: newId('exp'), title: item.title, category: item.category, amountUAH: item.amount, amountUSD: item.usd || 0, payDay: item.date.d, isPaid: !!item.paid };
             if (item.usd) e.currency = 'USD';
             if (item.cardId) e.cardId = item.cardId;
-            // Як і раніше, імпортовані витрати переходять у наступний місяць; розстрочка — з номером платежу.
+            // Як і раніше, імпортовані витрати — щомісячні серії; розстрочка — з номером платежу;
+            // з бекапу формату 7 — своє правило і серія.
             const inst = item.installment;
             const cur = Math.trunc(Number(inst?.current));
             const tot = Math.trunc(Number(inst?.total));
-            if (cur >= 1 && tot >= cur && tot <= 360) e.installment = { current: cur, total: tot };
-            else if (item.repeat !== false) e.repeat = true;
+            const date = isoDate(item.date.y, item.date.m, item.date.d);
+            let rule = cleanRule(item.rule);
+            if (!rule && cur >= 1 && tot >= cur && tot <= 1000) rule = { unit: 'month', every: 1, start: shiftBack(date, 'month', 1, cur - 1), count: tot };
+            if (!rule && item.repeat !== false) rule = { unit: 'month', every: 1, start: date };
+            if (rule) {
+                const base = `${item.monthKey}|${item.title.trim().toLowerCase()}|${item.category}|${rule.count || ''}`;
+                const nth = seen.get(base) || 0;
+                seen.set(base, nth + 1);
+                const key = /^[A-Za-z0-9_-]{1,64}$/.test(String(item.seriesId || '')) ? `id:${item.seriesId}` : `${base.slice(base.indexOf('|') + 1)}#${nth}`;
+                if (!seriesIds.has(key)) seriesIds.set(key, key.startsWith('id:') ? item.seriesId : newId('ser'));
+                e.repeat = rule;
+                e.seriesId = seriesIds.get(key);
+                if (cur >= 1 && tot >= cur) e.installment = { current: cur, total: tot };
+            }
             month.expenses.push(e);
         } else {
             const inc = { id: newId('inc'), title: item.title, category: item.category, amountUAH: item.amount, day: item.date.d, isReceived: !!item.paid, isPreset: false, debtor: item.from || '' };
