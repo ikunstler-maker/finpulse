@@ -1,6 +1,6 @@
 import { WrongKeyError } from '../crypto/vault.js';
 import { t } from '../i18n/index.js';
-import { prepareState } from '../state.js';
+import { prepareState, state } from '../state.js';
 import {
     changeVaultPassword, commitNewVault, connectGoogle, forgetThisDevice, getMode, hasPendingChanges, joinExistingVault,
     listConflicts, lockNow, prepareNewVault, readConflict, signedIn, syncNow, syncStatus,
@@ -8,6 +8,7 @@ import {
 import { REMEMBER_DAYS } from '../sync/local-vault.js';
 import { esc } from './format.js';
 import { exportBackup } from './more.js';
+import { hasUserData } from '../data/months.js';
 import { closeSheet, confirmSheet, openSheet, toast } from './sheet.js';
 import { replaceState, update } from '../state.js';
 
@@ -24,59 +25,103 @@ export function passwordProblem(pw, confirm) {
 
 const time = ts => new Date(ts).toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' });
 
-/** Текст і стан кнопки синхронізації в шапці. */
-export function syncChip() {
-    if (getMode() !== 'vault') return null;
-    if (syncStatus.phase === 'syncing') return { text: t('sync.chipSyncing'), state: 'busy' };
-    if (syncStatus.phase === 'error') return { text: t('sync.chipError'), state: 'error' };
-    if (!signedIn()) return { text: t('sync.chipSignIn'), state: 'action' };
-    if (hasPendingChanges()) return { text: t('sync.chipPending'), state: 'action' };
-    return { text: syncStatus.lastSyncAt ? t('sync.chipOk', { time: time(syncStatus.lastSyncAt) }) : t('sync.chipLocked'), state: 'ok' };
+/* ---------- Стан входу ---------- */
+
+/** Логотип Google: кольоровий; у стані «не увійшли» CSS робить його сірим. */
+export const GOOGLE_ICON = `<svg class="g-logo" viewBox="0 0 48 48" aria-hidden="true" focusable="false">
+    <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+    <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+    <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+    <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+</svg>`;
+
+/**
+ * Де зараз дані і що з синхронізацією:
+ * guest — не увійшли (дані лише в цьому браузері); інакше — увійшли, і phase: ok | busy | pending | error.
+ */
+export function accountState() {
+    if (getMode() !== 'vault') return { signedIn: false, phase: 'guest', title: t('account.guest'), sub: t('account.guestSub') };
+    const base = { signedIn: true, title: t('account.signedIn') };
+    if (syncStatus.phase === 'syncing') return { ...base, phase: 'busy', sub: t('account.syncing') };
+    if (syncStatus.phase === 'error') return { ...base, phase: 'error', sub: t('account.error') };
+    if (hasPendingChanges() || !signedIn()) return { ...base, phase: 'pending', sub: t(hasPendingChanges() ? 'account.pending' : 'account.notThisSession') };
+    return { ...base, phase: 'ok', sub: syncStatus.lastSyncAt ? t('account.syncedAt', { time: time(syncStatus.lastSyncAt) }) : t('account.encrypted') };
 }
 
-export async function chipAction() {
-    try {
-        const r = await syncNow({ interactive: true });
-        toast(r?.status === 'conflict' ? t('sync.conflictToast') : t('sync.done'));
-    } catch (e) {
-        toast(e.message);
-    }
+/** Кнопка в шапці: лише значок Google (сірий — не увійшли; кольоровий з обводкою — увійшли). */
+export function renderAccountButton(btn) {
+    if (!btn) return;
+    const a = accountState();
+    btn.dataset.state = a.phase;
+    btn.innerHTML = `${GOOGLE_ICON}<i class="account-dot" aria-hidden="true"></i>`;
+    const label = `${a.title}. ${a.sub}`;
+    btn.setAttribute('aria-label', label);
+    btn.title = label;
+}
+
+/** Блок угорі «Ще»: хто ви, де дані, що натиснути. */
+export function accountBlock() {
+    const a = accountState();
+    return `
+        <div class="account-block" data-state="${a.phase}">
+            <span class="account-icon">${GOOGLE_ICON}</span>
+            <span class="account-text"><strong id="account-title">${a.title}</strong><span id="account-sub">${a.sub}</span></span>
+            <button class="btn ${a.signedIn ? 'ghost' : 'primary'} small-btn" data-action="account">${t(a.signedIn ? 'account.manage' : 'account.signIn')}</button>
+        </div>`;
+}
+
+/** Натискання на значок або кнопку входу. */
+export function openAccount() {
+    if (getMode() === 'vault') openSyncSheet();
+    else openSignIn();
 }
 
 /* ---------- Увімкнення: майстер ---------- */
 
-export function openSetup() {
-    let backupDone = false;
+/**
+ * Вхід: один шлях. Спершу Google; далі застосунок сам дивиться, чи є дані FinPulse на Диску:
+ * є — просить пароль FinPulse (вхід на новому пристрої); немає — створює пароль і ключ (перший вхід).
+ * Резервну копію просимо лише тоді, коли дані цього браузера буде замінено даними з Диска.
+ */
+export function openSignIn() {
     const sheet = openSheet(`
-        <h3>${t('setup.title')}</h3>
+        <h3>${t('signin.title')}</h3>
+        <p class="sheet-text">${t('signin.intro')}</p>
         <ol class="steps">
-            <li>${t('setup.step1')}</li>
-            <li>${t('setup.step2')}</li>
-            <li>${t('setup.step3')}</li>
+            <li>${t('signin.step1')}</li>
+            <li>${t('signin.step2')}</li>
         </ol>
-        <p class="sheet-text">${t('setup.warning')} <a href="./security.html">${t('links.security')}</a></p>
+        <p class="sheet-text small">${t('setup.warning')} <a href="./security.html">${t('links.security')}</a></p>
         <div class="actions">
-            <button class="btn ghost" type="button" id="setup-backup">${t('setup.backup')}</button>
-            <button class="btn primary" type="button" id="setup-next" disabled>${t('setup.google')}</button>
-        </div>
-        <p class="sheet-text small">${t('setup.backupHint')}</p>`, { label: t('setup.title') });
-    sheet.querySelector('#setup-backup').addEventListener('click', () => {
-        exportBackup();
-        backupDone = true;
-        sheet.querySelector('#setup-next').disabled = false;
-    });
-    sheet.querySelector('#setup-next').addEventListener('click', async () => {
-        if (!backupDone) return;
-        const btn = sheet.querySelector('#setup-next');
+            <button class="btn google-btn" type="button" id="signin-google">${GOOGLE_ICON}<span>${t('signin.google')}</span></button>
+        </div>`, { label: t('signin.title') });
+    sheet.querySelector('#signin-google').addEventListener('click', async () => {
+        const btn = sheet.querySelector('#signin-google');
         btn.disabled = true;
         try {
             const remote = await connectGoogle();
-            if (remote) openJoin(remote);
-            else openCreatePassword();
+            if (!remote) openCreatePassword();
+            else if (hasUserData(state)) openReplaceWarning(remote);
+            else openJoin(remote);
         } catch (e) {
             btn.disabled = false;
             toast(e.message);
         }
+    });
+}
+
+/** На Диску вже є дані, а в браузері — власні записи: вони будуть замінені. Спершу копія. */
+function openReplaceWarning(remote) {
+    const sheet = openSheet(`
+        <h3>${t('signin.replaceTitle')}</h3>
+        <p class="sheet-text">${t('signin.replaceText')}</p>
+        <div class="actions">
+            <button class="btn primary" type="button" id="replace-backup">${t('signin.replaceBackup')}</button>
+            <button class="btn ghost" type="button" data-action="close-sheet">${t('common.cancel')}</button>
+        </div>`, { label: t('signin.replaceTitle') });
+    sheet.querySelector('#replace-backup').addEventListener('click', () => {
+        exportBackup();
+        openJoin(remote);
     });
 }
 
@@ -170,11 +215,14 @@ function openJoin(remote) {
 /* ---------- Керування синхронізацією ---------- */
 
 export function openSyncSheet() {
-    const last = syncStatus.lastSyncAt ? t('sync.lastAt', { time: time(syncStatus.lastSyncAt) }) : t('sync.never');
+    const a = accountState();
     const sheet = openSheet(`
         <h3>${t('sync.title')}</h3>
+        <div class="account-block" data-state="${a.phase}">
+            <span class="account-icon">${GOOGLE_ICON}</span>
+            <span class="account-text"><strong>${a.title}</strong><span id="sync-state">${a.sub}${syncStatus.error ? ` · ${esc(syncStatus.error)}` : ''}</span></span>
+        </div>
         <p class="sheet-text">${t('sync.about')}</p>
-        <div class="result" id="sync-state">${signedIn() ? last : t('sync.notSignedIn')}${hasPendingChanges() ? ` · ${t('sync.pending')}` : ''}${syncStatus.error ? `<br>${esc(syncStatus.error)}` : ''}</div>
         <div class="menu">
             <button data-sync="now"><strong>${t('sync.now')}</strong><span>${t('sync.nowSub')}</span></button>
             <button data-sync="conflicts"><strong>${t('sync.conflicts')}</strong><span>${t('sync.conflictsSub')}</span></button>
@@ -258,10 +306,4 @@ function openChangePassword() {
         closeSheet();
         toast(t('sync.passwordChanged'));
     });
-}
-
-/** Пункт меню «Ще»: увімкнути або керувати. */
-export function openEncryption() {
-    if (getMode() === 'vault') openSyncSheet();
-    else openSetup();
 }

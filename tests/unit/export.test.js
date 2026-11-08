@@ -96,3 +96,20 @@ describe('нові місяці без вигаданих заощаджень',
         expect(other.months['2026-10'].incomes.find(i => i.category === 'savings').amountUAH).toBe(0);
     });
 });
+
+describe('власні записи (для попередження перед входом)', async () => {
+    const { hasUserData } = await import('../../src/data/months.js');
+    it('приклад і порожній бюджет — ні; запис, картка чи дохід — так', () => {
+        expect(hasUserData(demo())).toBe(false);
+        const st = createEmptyState(new Date(2026, 9, 29));
+        expect(hasUserData(st)).toBe(false);
+        st.months['2026-10'].expenses.push({ id: 'e', title: 'Кава', amountUAH: 60, payDay: 1 });
+        expect(hasUserData(st)).toBe(true);
+        const c = createEmptyState(new Date(2026, 9, 29));
+        c.cards.push({ id: 'c', name: 'Моно', color: '#000000' });
+        expect(hasUserData(c)).toBe(true);
+        const i = createEmptyState(new Date(2026, 9, 29));
+        i.months['2026-10'].incomes[0].amountUAH = 100;
+        expect(hasUserData(i)).toBe(true);
+    });
+});

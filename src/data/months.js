@@ -52,3 +52,18 @@ export function createEmptyState(today = new Date(), rate = 41.5) {
     ensurePresetIncomes(month);
     return { version: DATA_VERSION, cards: [], activeMonthKey: key, months: { [key]: month } };
 }
+
+/**
+ * Чи є в бюджеті власні записи людини (не приклад і не порожній новий бюджет).
+ * Потрібно, щоб попередити перед заміною даних цього браузера даними з Диска.
+ */
+export function hasUserData(state) {
+    if (!state || state.demo) return false;
+    if ((state.cards || []).length || (state.goals || []).length) return true;
+    return Object.values(state.months || {}).some(m => m && (
+        (m.expenses || []).length
+        || (m.incomes || []).some(i => (i.amountUAH || 0) > 0)
+        || (m.salaryParts || []).some(p => (p.uah || 0) > 0)
+        || (m.goalMoves || []).length
+    ));
+}

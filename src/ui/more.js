@@ -7,6 +7,7 @@ import { activeMonth, prepareState, saveState, setState, state, update } from '.
 import { isEncrypted } from '../sync/controller.js';
 import { esc, money } from './format.js';
 import { closeSheet, confirmSheet, openSheet, toast } from './sheet.js';
+import { accountBlock } from './sync-ui.js';
 
 const THEME_KEY = 'finpulse_theme';
 
@@ -88,6 +89,7 @@ export function openMoreSheet() {
     const m = activeMonth();
     const sheet = openSheet(`
         <h3>${t('more.title')}</h3>
+        ${accountBlock()}
         ${quickToggles()}
         <div class="menu">
             <button data-action="open-reconcile"><strong>${t('more.reconcile')}</strong><span>${t('more.reconcileSub')}</span></button>
@@ -95,7 +97,6 @@ export function openMoreSheet() {
             <button data-action="open-reminders"><strong>${t('more.reminders')}</strong><span>${t('reminders.menuSub')}</span></button>
             <button data-action="open-cards"><strong>${t('more.cards')}</strong><span>${(state.cards || []).length ? t('more.cardsSub', { n: state.cards.length }) : t('more.cardsEmpty')}</span></button>
             <button data-action="open-import"><strong>${t('more.import')}</strong><span>${t('more.importSub')}</span></button>
-            <button data-action="open-encryption"><strong>${t('more.encryption')}</strong><span>${t(isEncrypted() ? 'more.encryptionOn' : 'more.encryptionOff')}</span></button>
             <button data-action="open-backup"><strong>${t('more.backup')}</strong><span>${t('more.backupSub')}</span></button>
         </div>
         <p class="local-note">${t(isEncrypted() ? 'summary.encryptedNote' : 'summary.localNote')}</p>
