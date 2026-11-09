@@ -10,6 +10,11 @@ export function t(key, params = {}) {
     return value.replace(/\{(\w+)\}/g, (m, name) => (name in params ? String(params[name]) : m));
 }
 
+/** Не текст, а дані зі словника (наприклад, список оновлень). */
+export function tData(key) {
+    return key.split('.').reduce((o, k) => (o == null ? o : o[k]), uk);
+}
+
 /** Українська множина: одна / кілька / багато. */
 export function plural(n, [one, few, many]) {
     const a = Math.abs(n) % 100;
