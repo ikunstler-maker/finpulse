@@ -142,6 +142,19 @@ export function startApp() {
         view.filter.search = e.target.value;
         render();
     });
+    // Календар: свайп ліворуч — наступний місяць, праворуч — попередній (лише на сітці, горизонтальний рух).
+    let swipe = null;
+    document.addEventListener('touchstart', e => {
+        swipe = e.touches.length === 1 && e.target.closest('.cal-grid') ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : null;
+    }, { passive: true });
+    document.addEventListener('touchend', e => {
+        if (!swipe || sheetOpen()) return;
+        const dx = e.changedTouches[0].clientX - swipe.x;
+        const dy = e.changedTouches[0].clientY - swipe.y;
+        swipe = null;
+        if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+        stepMonth(dx < 0 ? 1 : -1);
+    }, { passive: true });
     document.addEventListener('keydown', e => {
         if (e.key === 'Escape' && sheetOpen()) closeSheet();
     });
