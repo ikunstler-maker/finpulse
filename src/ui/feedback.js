@@ -1,10 +1,10 @@
-import { FEEDBACK_FORM } from '../config.js';
+import { FEEDBACK_URL } from '../config.js';
 import { t, tData } from '../i18n/index.js';
 import { closeSheet, openSheet, toast } from './sheet.js';
 import { pickerField, wirePickers } from './picker.js';
 
 /*
- * Відгук: тип + опис (+ контакт, + технічні дані за згодою) → Google Форма власниці.
+ * Відгук: тип + опис (+ контакт, + технічні дані за згодою) → скрипт Google Apps Script → рядок у таблиці власниці.
  * Фінансові дані не надсилаються; людину попереджаємо не вписувати суми й паролі.
  */
 
@@ -17,7 +17,7 @@ const TYPES = {
     other: '<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.4 1 1.1 1 1.8V16h5v-.3c0-.7.4-1.4 1-1.8A6 6 0 0 0 12 3z"/>',
 };
 
-export const feedbackReady = () => !!(FEEDBACK_FORM.action && FEEDBACK_FORM.fields.type && FEEDBACK_FORM.fields.text);
+export const feedbackReady = () => /^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(FEEDBACK_URL);
 
 /** Технічні дані без фінансів: версія (останнє оновлення), браузер, екран. */
 function techInfo() {
@@ -58,22 +58,25 @@ export function openFeedbackSheet() {
         if (!type) return fail(t('feedback.errType'));
         if (text.length < 5) return fail(t('feedback.errText'));
         if (!feedbackReady()) return fail(t('feedback.notReady'));
-        const f = FEEDBACK_FORM.fields;
-        const body = new URLSearchParams();
-        body.set(f.type, t(`feedback.types.${type}`));
-        body.set(f.text, text);
-        if (f.contact) body.set(f.contact, sheet.querySelector('#f-fb-contact').value.trim());
-        if (f.tech && sheet.querySelector('#f-fb-tech').checked) body.set(f.tech, techInfo());
+        const payload = {
+            app: 'finpulse',
+            type,
+            text,
+            contact: sheet.querySelector('#f-fb-contact').value.trim(),
+            tech: sheet.querySelector('#f-fb-tech').checked ? techInfo() : '',
+        };
         const btn = sheet.querySelector('button[type=submit]');
         btn.disabled = true;
         try {
-            // Google Форма не дозволяє читати відповідь іншим сайтам — отримуємо «непрозору» відповідь; помилка — лише без мережі.
-            await fetch(FEEDBACK_FORM.action, { method: 'POST', mode: 'no-cors', body });
+            // text/plain — щоб браузер не робив попереднього запиту, якого Apps Script не підтримує.
+            const res = await fetch(FEEDBACK_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(payload), redirect: 'follow' });
+            const result = await res.json().catch(() => null);
+            if (!result?.ok) throw new Error(result?.error || 'failed');
             closeSheet();
             toast(t('feedback.thanks'));
-        } catch {
+        } catch (e) {
             btn.disabled = false;
-            fail(t('feedback.errNetwork'));
+            fail(t(navigator.onLine === false ? 'feedback.errNetwork' : e.message === 'too_many' ? 'feedback.errTooMany' : 'feedback.errSend'));
         }
     });
 }

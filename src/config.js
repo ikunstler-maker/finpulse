@@ -5,10 +5,7 @@ export const GOOGLE_CLIENT_ID = '941554571524-nk0fj2isaanujs66f5vfplij0l19ud43.a
 export const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
 
 /**
- * Відгуки: Google Форма власниці, прив'язана до її Google Таблиці. Не секрет — адреса публічної форми.
- * action — адреса formResponse; fields — назви полів форми (entry.…). Порожньо — форма ще не підключена.
+ * Відгуки: вебзастосунок Google Apps Script власниці, який дописує рядок у її Google Таблицю
+ * (код — scripts/google-apps-script/feedback.gs). Адреса не секретна. Порожньо — ще не підключено.
  */
-export const FEEDBACK_FORM = {
-    action: '',
-    fields: { type: '', text: '', contact: '', tech: '' },
-};
+export const FEEDBACK_URL = '';
