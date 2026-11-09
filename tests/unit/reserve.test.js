@@ -69,3 +69,24 @@ describe('формат 8', () => {
         expect('reserve' in b).toBe(false);
     });
 });
+
+describe('перетворення на резерв без дубля', () => {
+    it('щомісячна витрата 9-го → резерв «цей і наступні»: один резерв у місяці', async () => {
+        const { applyFromHere } = await import('../../src/data/series.js');
+        const st = migrateState({ version: 8, activeMonthKey: '2026-10', months: {
+            '2026-10': month(2026, 10, [{ id: 'f', title: 'Продукти', category: 'food', amountUAH: 8000, payDay: 9, isPaid: false, seriesId: 's', repeat: { unit: 'month', every: 1, start: '2026-10-09' } }]),
+            '2026-11': month(2026, 11, [{ id: 'g', title: 'Продукти', category: 'food', amountUAH: 8000, payDay: 9, isPaid: false, seriesId: 's', repeat: { unit: 'month', every: 1, start: '2026-10-09' } }]),
+        } });
+        const f = st.months['2026-10'].expenses[0];
+        f.reserve = { spends: [] };
+        applyFromHere(st, '2026-10', f, f.repeat);
+        expect(st.months['2026-10'].expenses.filter(e => e.title === 'Продукти')).toHaveLength(1);
+        expect(st.months['2026-11'].expenses.filter(e => e.title === 'Продукти')).toHaveLength(1);
+        expect(st.months['2026-11'].expenses[0].reserve).toEqual({ spends: [] });
+    });
+    it('уже збережений дубль прибирається при відкритті; резерв із витратами лишається', () => {
+        const dup = (id, spends) => ({ id, title: 'Продукти', category: 'food', amountUAH: 8000, payDay: 1, isPaid: false, seriesId: 's', repeat: { unit: 'month', every: 1, start: '2026-10-09' }, reserve: { spends } });
+        const st = migrateState({ version: 8, months: { '2026-10': month(2026, 10, [dup('a', []), dup('b', [{ id: 'x', amount: 500 }]), { id: 'c', title: 'Інше', amountUAH: 1, payDay: 2 }]) } });
+        expect(st.months['2026-10'].expenses.map(e => e.id)).toEqual(['b', 'c']);
+    });
+});

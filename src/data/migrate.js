@@ -68,6 +68,25 @@ function toRules(month, seriesIds) {
     }
 }
 
+/**
+ * Виправлення: перетворення щомісячної витрати на резерв могло створити другий порожній резерв
+ * тієї ж серії в тому ж місяці. Лишаємо той, у якому вже є витрати (або перший); порожні несплачені копії прибираємо.
+ */
+function dropDuplicateReserves(month) {
+    if (!month || !Array.isArray(month.expenses)) return;
+    const bySeries = new Map();
+    for (const e of month.expenses) {
+        if (e.reserve && e.seriesId) bySeries.set(e.seriesId, [...(bySeries.get(e.seriesId) || []), e]);
+    }
+    const drop = new Set();
+    for (const list of bySeries.values()) {
+        if (list.length < 2) continue;
+        const keep = list.find(e => e.reserve.spends?.length) || list[0];
+        list.forEach(e => { if (e !== keep && !e.isPaid && !e.reserve.spends?.length) drop.add(e); });
+    }
+    if (drop.size) month.expenses = month.expenses.filter(e => !drop.has(e));
+}
+
 export function migrateState(state) {
     if (!state || !state.months) return state;
     const before6 = !(state.version >= 6);
@@ -84,6 +103,7 @@ export function migrateState(state) {
             month.salaryParts = (month.incomeUAH || 0) > 0 ? [legacySalaryPart(month)] : [];
         }
     }
+    for (const month of Object.values(state.months)) dropDuplicateReserves(month);
     if (!Array.isArray(state.cards)) state.cards = [];
     state.version = DATA_VERSION;
     return state;

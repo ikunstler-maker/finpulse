@@ -4,7 +4,15 @@ import { openApp, openMore } from './helpers.js';
 test('відгук: тип з іконками, поле опису, попередження про приватність', async ({ page }) => {
     await openApp(page);
     await openMore(page);
-    await page.locator('[data-action="open-feedback"]').click();
+    // поки скрипт власниці не підключено, пункту в меню немає; вікно відкриваємо напряму
+    await expect(page.locator('[data-action="open-feedback"]')).toHaveCount(0);
+    await page.evaluate(() => {
+        const b = document.createElement('button');
+        b.dataset.action = 'open-feedback';
+        b.id = 'fb-test';
+        document.body.append(b);
+    });
+    await page.locator('#fb-test').dispatchEvent('click');
     await expect(page.locator('.sheet h3')).toHaveText('Надіслати відгук');
     await page.locator('[data-picker="f-fb-type"] .picker-btn').click();
     const opts = page.locator('[data-picker="f-fb-type"] li');
