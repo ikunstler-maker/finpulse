@@ -48,6 +48,28 @@ function cleanRecurrence(e) {
         else delete e.repeat;
     }
     if ('seriesId' in e && !SAFE_ID.test(str(e.seriesId))) delete e.seriesId;
+    if ('noDate' in e) {
+        if (e.noDate) e.noDate = true;
+        else delete e.noDate;
+    }
+    if ('reserve' in e) {
+        const r = e.reserve;
+        if (!r || typeof r !== 'object') delete e.reserve;
+        else {
+            e.reserve = {
+                spends: (Array.isArray(r.spends) ? r.spends : [])
+                    .filter(x => x && typeof x === 'object' && num(x.amount) > 0)
+                    .slice(0, 2000)
+                    .map(x => {
+                        const out = { id: SAFE_ID.test(str(x.id)) ? x.id : newId('sp'), amount: Math.round(num(x.amount) * 100) / 100 };
+                        const day = Math.trunc(num(x.day));
+                        if (day >= 1 && day <= 31) out.day = day;
+                        if (x.note) out.note = str(x.note).slice(0, 120);
+                        return out;
+                    }),
+            };
+        }
+    }
     if ('installment' in e) {
         const i = e.installment;
         const current = Math.trunc(num(i?.current));

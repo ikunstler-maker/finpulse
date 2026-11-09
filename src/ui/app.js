@@ -11,7 +11,8 @@ import {
     createNextMonthFromActive, openBackupSheet, openMonthsSheet, openMoreSheet, openReconcileSheet,
     selectMonth, stepMonth,
 } from './more.js';
-import { calendarView, openDaySheet, refreshDaySheet } from './calendar.js';
+import { openReserveSheet } from './reserve.js';
+import { calendarView, openDaySheet, openUndatedSheet, refreshDaySheet } from './calendar.js';
 import { currentPeriodLabel, reportsView } from './reports.js';
 import { openExportSheet } from './export.js';
 import { notifyOnOpen, openRemindersSheet } from './reminders.js';
@@ -104,6 +105,8 @@ const actions = {
     'new-card': () => openCardSheet(),
     'edit-card': el => openCardSheet(el.dataset.id),
     'open-import': () => openImportSheet(),
+    'open-reserve': el => openReserveSheet(el.dataset.month, el.dataset.id),
+    'cal-undated': () => openUndatedSheet(),
     'cal-day': el => openDaySheet(Number(el.dataset.day)),
     'open-export': () => openExportSheet(currentPeriodLabel()),
     'open-reminders': () => openRemindersSheet(render),

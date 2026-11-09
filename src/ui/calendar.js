@@ -2,6 +2,8 @@ import { CATEGORIES, INCOME_CATEGORIES } from '../data/categories.js';
 import { t } from '../i18n/index.js';
 import { activeMonth, state } from '../state.js';
 import { expenseRow, openExpenseSheet } from './budget.js';
+import { expensePending, isUndated } from '../calc.js';
+import { esc } from './format.js';
 import { dayMonthLong, money, money0 } from './format.js';
 import { incomeRow, openIncomeSheet, partRow } from './incomes.js';
 import { closeSheet, openSheet } from './sheet.js';
@@ -19,8 +21,13 @@ const SALARY_COLOR = '#157a5b';
 export function dayItems(m) {
     const last = new Date(m.year, m.month, 0).getDate();
     const clamp = d => Math.min(Math.max(1, Number(d) || 1), last);
-    const days = Array.from({ length: last + 1 }, () => ({ expenses: [], incomes: [], parts: [] }));
-    for (const e of m.expenses || []) days[clamp(e.payDay)].expenses.push(e);
+    const days = Array.from({ length: last + 1 }, () => ({ expenses: [], incomes: [], parts: [], spends: [] }));
+    for (const e of m.expenses || []) {
+        if (e.reserve) {
+            // витрати з резерву — у свої дні
+            for (const s of e.reserve.spends) if (s.day) days[clamp(s.day)].spends.push({ ...s, title: e.title, category: e.category, amountUAH: s.amount });
+        } else if (!isUndated(e)) days[clamp(e.payDay)].expenses.push(e);
+    }
     for (const p of m.salaryParts || []) if ((p.uah || 0) > 0) days[clamp(p.day || m.salaryDay)].parts.push(p);
     for (const i of m.incomes || []) if ((i.amountUAH || 0) > 0) days[clamp(i.day)].incomes.push(i);
     return days;
@@ -46,11 +53,12 @@ export function calendarView(today = new Date()) {
     const cells = [];
     for (let i = 0; i < lead; i++) cells.push('<div class="cal-cell empty" aria-hidden="true"></div>');
     for (let d = 1; d <= last; d++) {
-        const { expenses, incomes, parts } = days[d];
-        const spent = sumOf(expenses);
+        const { expenses, incomes, parts, spends } = days[d];
+        const spent = sumOf(expenses) + sumOf(spends);
         const got = sumOf(incomes) + sumOf(parts);
         const dots = [
             ...expenses.map(e => `<i class="${e.isPaid ? 'paid' : ''}" style="background:${catColor(e.category)}"></i>`),
+            ...spends.map(s => `<i class="paid" style="background:${catColor(s.category)}"></i>`),
             ...parts.map(() => `<i class="inc" style="background:${SALARY_COLOR}"></i>`),
             ...incomes.map(i => `<i class="inc" style="background:${incColor(i.category)}"></i>`),
         ];
@@ -63,13 +71,16 @@ export function calendarView(today = new Date()) {
                 ${got ? `<span class="cal-sum in num">+${shortAmount(got)}</span>` : ''}
             </button>`);
     }
-    const total = sumOf(m.expenses || []);
+    const total = sumOf((m.expenses || []).filter(e => !e.reserve)) + (m.expenses || []).filter(e => e.reserve).reduce((s, e) => s + e.reserve.spends.reduce((a, x) => a + x.amount, 0), 0);
+    const undated = (m.expenses || []).filter(e => isUndated(e) && !e.isPaid);
+    const undatedSum = undated.reduce((s, e) => s + expensePending(e), 0);
     const income = sumOf(m.incomes || []) + sumOf(m.salaryParts || []);
     return `
         <section class="calendar" aria-label="${t('calendar.label', { month: m.name })}">
             <div class="cal-head">
                 <span>${t('calendar.monthTotals', { spent: money0(total), got: money0(income) })}</span>
             </div>
+            ${undated.length ? `<button class="cal-undated" data-action="cal-undated">${t('calendar.undated', { n: undated.length, amount: money0(undatedSum) })}</button>` : ''}
             <div class="cal-grid" role="grid">
                 ${weekdays.map((w, i) => `<div class="cal-wd ${i > 4 ? 'weekend' : ''}" aria-hidden="true">${w}</div>`).join('')}
                 ${cells.join('')}
@@ -84,10 +95,10 @@ let openDay = null;
 export function openDaySheet(day, today = new Date()) {
     openDay = day;
     const m = activeMonth();
-    const { expenses, incomes, parts } = dayItems(m)[day] || { expenses: [], incomes: [], parts: [] };
+    const { expenses, incomes, parts, spends } = dayItems(m)[day] || { expenses: [], incomes: [], parts: [], spends: [] };
     const sheet = openSheet(`
         <h3>${dayMonthLong(m.month, day)}</h3>
-        <div id="day-sheet" data-day="${day}">${dayBody(m, day, expenses, incomes, parts, today)}</div>
+        <div id="day-sheet" data-day="${day}">${dayBody(m, day, expenses, incomes, parts, today, spends)}</div>
         <div class="actions"><div class="two">
             <button class="btn primary" type="button" data-cal-add="expense">${t('calendar.addExpense')}</button>
             <button class="btn ghost" type="button" data-cal-add="income">${t('calendar.addIncome')}</button>
@@ -101,11 +112,12 @@ export function openDaySheet(day, today = new Date()) {
     });
 }
 
-function dayBody(m, day, expenses, incomes, parts, today) {
-    if (!expenses.length && !incomes.length && !parts.length) return `<p class="empty">${t('calendar.emptyDay')}</p>`;
+function dayBody(m, day, expenses, incomes, parts, today, spends = []) {
+    if (!expenses.length && !incomes.length && !parts.length && !spends.length) return `<p class="empty">${t('calendar.emptyDay')}</p>`;
     return `
-        ${expenses.length ? `<p class="cal-day-sum">${t('calendar.dayExpenses', { amount: money(sumOf(expenses)) })}</p>
-            <div class="list">${expenses.map(e => expenseRow(e, m, state.activeMonthKey, today)).join('')}</div>` : ''}
+        ${expenses.length || spends.length ? `<p class="cal-day-sum">${t('calendar.dayExpenses', { amount: money(sumOf(expenses) + sumOf(spends)) })}</p>
+            <div class="list">${expenses.map(e => expenseRow(e, m, state.activeMonthKey, today)).join('')}
+            ${spends.map(s => `<div class="spend"><span class="spend-day"><i class="dot" style="background:${catColor(s.category)}"></i></span><span class="spend-note">${esc(t('calendar.fromReserve', { title: s.title }))}${s.note ? ` · ${esc(s.note)}` : ''}</span><span class="num">${money(s.amount)}</span></div>`).join('')}</div>` : ''}
         ${parts.length || incomes.length ? `<p class="cal-day-sum">${t('calendar.dayIncomes', { amount: money(sumOf(incomes) + sumOf(parts)) })}</p>
             <div class="list">${parts.map(p => partRow(p, m)).join('')}${incomes.map(i => incomeRow(i, m, incColor(i.category))).join('')}</div>` : ''}`;
 }
@@ -115,6 +127,25 @@ export function refreshDaySheet(today = new Date()) {
     const box = document.getElementById('day-sheet');
     if (!box || openDay == null) return;
     const m = activeMonth();
-    const { expenses, incomes, parts } = dayItems(m)[openDay] || { expenses: [], incomes: [], parts: [] };
-    box.innerHTML = dayBody(m, openDay, expenses, incomes, parts, today);
+    if (openDay === 'undated') {
+        box.innerHTML = undatedBody(m, today);
+        return;
+    }
+    const { expenses, incomes, parts, spends } = dayItems(m)[openDay] || { expenses: [], incomes: [], parts: [], spends: [] };
+    box.innerHTML = dayBody(m, openDay, expenses, incomes, parts, today, spends);
+}
+
+function undatedBody(m, today) {
+    const list = (m.expenses || []).filter(e => isUndated(e) && !e.isPaid);
+    return list.length ? `<div class="list">${list.map(e => expenseRow(e, m, state.activeMonthKey, today)).join('')}</div>` : `<p class="empty">${t('calendar.noUndated')}</p>`;
+}
+
+/** Вікно «Без дати»: резерви й платежі, день яких ще не визначено. */
+export function openUndatedSheet(today = new Date()) {
+    openDay = 'undated';
+    const m = activeMonth();
+    openSheet(`
+        <h3>${t('calendar.undatedTitle')}</h3>
+        <p class="sheet-text small">${t('calendar.undatedHint')}</p>
+        <div id="day-sheet">${undatedBody(m, today)}</div>`, { label: t('calendar.undatedTitle') });
 }

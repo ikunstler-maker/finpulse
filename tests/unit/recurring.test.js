@@ -49,7 +49,7 @@ describe('перехід на формат 7', () => {
             '2026-10': month(2026, 10, [exp('Оренда', { repeat: true }), exp('Подарунок'), exp('Телефон', { payDay: 11, installment: { current: 3, total: 6 } })]),
             '2026-11': month(2026, 11, [exp('Оренда', { repeat: true })]),
         } });
-        expect(st.version).toBe(7);
+        expect(st.version).toBe(8);
         const [rent, gift, phone] = st.months['2026-10'].expenses;
         expect(rent.repeat).toEqual({ unit: 'month', every: 1, start: '2026-10-10' });
         expect(gift.repeat).toBeUndefined();

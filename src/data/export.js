@@ -3,7 +3,7 @@
  * Файли створюються в браузері й зберігаються на пристрій. CSV і JSON сумісні з імпортом FinPulse.
  * Тексти (заголовки, «так/ні») передає інтерфейс зі словника — тут їх немає.
  */
-import { periodMonthKeys, round2 } from '../calc.js';
+import { expensePaid, expensePlanned, periodMonthKeys, round2 } from '../calc.js';
 import { CATEGORIES, INCOME_CATEGORIES } from './categories.js';
 import { DATA_VERSION } from './migrate.js';
 import { writeXLSX } from './xlsx.js';
@@ -32,7 +32,7 @@ export function reportData(state, { period = 'current', from = '', to = '' } = {
             const d = date(e.payDay);
             if (!inRange(d)) continue;
             const cat = CATEGORIES.find(c => c.id === e.category) || CATEGORIES.find(c => c.id === 'other');
-            expenses.push({ monthKey: k, date: d, title: e.title || '', categoryId: cat.id, category: cat.name, amount: round2(e.amountUAH || 0), foreign: e.amountUSD > 0 ? e.amountUSD : 0, currency: e.amountUSD > 0 ? e.currency || 'USD' : '', paid: !!e.isPaid, card: cardName(e.cardId), kind: 'expense', src: e });
+            expenses.push({ monthKey: k, date: d, title: e.title || '', categoryId: cat.id, category: cat.name, amount: round2(expensePlanned(e)), paidAmount: round2(expensePaid(e)), foreign: e.amountUSD > 0 ? e.amountUSD : 0, currency: e.amountUSD > 0 ? e.currency || 'USD' : '', paid: !!e.isPaid, card: cardName(e.cardId), kind: 'expense', src: e });
         }
         if (Array.isArray(m.salaryParts)) {
             for (const p of m.salaryParts) {
@@ -63,7 +63,7 @@ export function reportData(state, { period = 'current', from = '', to = '' } = {
         income: sum(incomes),
         incomeReceived: sum(incomes.filter(x => x.paid)),
         expenses: sum(expenses),
-        paid: sum(expenses.filter(x => x.paid)),
+        paid: round2(expenses.reduce((s, x) => s + x.paidAmount, 0)),
     };
     totals.balance = round2(totals.income - totals.expenses);
     return { monthKeys: keys, expenses, incomes, totals, byCategory: { expenses: group(expenses), incomes: group(incomes) } };

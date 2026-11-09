@@ -9,7 +9,31 @@
 /** Курс за замовчуванням, коли в місяці його ще не задано. */
 export const DEFAULT_RATE = 41.5;
 
+/* ---------- Витрати без дати і «Резерв» (формат 8) ---------- */
+
+/** Витрачено з резерву (сума записаних витрат). */
+export const reserveSpent = e => (e?.reserve?.spends || []).reduce((s, x) => s + (x.amount || 0), 0);
+/** Без конкретного дня: «дата пізніше» або резерв на місяць. Не бувають простроченими. */
+export const isUndated = e => !!(e && (e.noDate || e.reserve));
+
+/** Скільки витрата забирає з бюджету місяця. Резерв — його сума (або більше, якщо перевищено); закритий — лише витрачене. */
+export function expensePlanned(e) {
+    if (!e.reserve) return e.amountUAH || 0;
+    const spent = reserveSpent(e);
+    return e.isPaid ? spent : Math.max(e.amountUAH || 0, spent);
+}
+/** Уже сплачено/витрачено. */
+export function expensePaid(e) {
+    return e.reserve ? reserveSpent(e) : e.isPaid ? e.amountUAH || 0 : 0;
+}
+/** Ще треба сплатити (для резерву — невитрачений залишок, поки його не закрито). */
+export function expensePending(e) {
+    if (e.reserve) return e.isPaid ? 0 : Math.max(0, (e.amountUAH || 0) - reserveSpent(e));
+    return e.isPaid ? 0 : e.amountUAH || 0;
+}
+
 export function isExpenseOverdue(expense, curMonth, today = new Date()) {
+    if (isUndated(expense)) return false;
     const curYear = today.getFullYear();
     const curMonthNum = today.getMonth() + 1;
     const curDay = today.getDate();
@@ -99,7 +123,7 @@ export function monthReceivedIncome(month) {
 /** Витрати наступного місяця, які треба сплатити до його ЗП («місток»). */
 export function bridgeExpenses(nextMonth) {
     if (!nextMonth || !Array.isArray(nextMonth.expenses)) return { items: [], total: 0 };
-    const items = nextMonth.expenses.filter(e => e.payDay < nextMonth.salaryDay);
+    const items = nextMonth.expenses.filter(e => !isUndated(e) && e.payDay < nextMonth.salaryDay);
     return { items, total: sumUAH(items) };
 }
 
@@ -115,13 +139,10 @@ export function computeMonthSummary(state, monthKey, today = new Date()) {
     let totalPendingUAH = 0;
     let overdueCount = 0;
     month.expenses.forEach(e => {
-        totalPlannedUAH += e.amountUAH;
-        if (e.isPaid) {
-            totalPaidUAH += e.amountUAH;
-        } else {
-            totalPendingUAH += e.amountUAH;
-            if (isExpenseOverdue(e, month, today)) overdueCount++;
-        }
+        totalPlannedUAH += expensePlanned(e);
+        totalPaidUAH += expensePaid(e);
+        totalPendingUAH += expensePending(e);
+        if (!e.isPaid && isExpenseOverdue(e, month, today)) overdueCount++;
     });
 
     const nextMonth = state.months[getNextMonthKey(monthKey)];
@@ -163,9 +184,9 @@ export function computeMonthSummary(state, monthKey, today = new Date()) {
 /** Підсумок по категорії витрат ('all' — усі категорії). */
 export function categorySummary(expenses, categoryId = 'all') {
     const items = categoryId === 'all' ? expenses : expenses.filter(e => e.category === categoryId);
-    const total = items.reduce((s, e) => s + e.amountUAH, 0);
-    const spent = items.filter(e => e.isPaid).reduce((s, e) => s + e.amountUAH, 0);
-    const remaining = items.filter(e => !e.isPaid).reduce((s, e) => s + e.amountUAH, 0);
+    const total = items.reduce((s, e) => s + expensePlanned(e), 0);
+    const spent = items.reduce((s, e) => s + expensePaid(e), 0);
+    const remaining = items.reduce((s, e) => s + expensePending(e), 0);
     const pct = total > 0 ? Math.round((spent / total) * 100) : 0;
     return { total, spent, remaining, pct };
 }
@@ -175,8 +196,8 @@ export function categorySummary(expenses, categoryId = 'all') {
  * доходи − (усі витрати місяця + витрати наступного місяця до ЗП).
  */
 export function carryOverBalance(month, nextMonthExpenses, salaryDay) {
-    const planned = (month.expenses || []).reduce((s, e) => s + e.amountUAH, 0);
-    const bridge = (nextMonthExpenses || []).filter(e => e.payDay < salaryDay).reduce((s, e) => s + e.amountUAH, 0);
+    const planned = (month.expenses || []).reduce((s, e) => s + expensePlanned(e), 0);
+    const bridge = (nextMonthExpenses || []).filter(e => !isUndated(e) && e.payDay < salaryDay).reduce((s, e) => s + e.amountUAH, 0);
     return Math.max(0, monthIncomeTotal(month) - (planned + bridge));
 }
 
@@ -185,8 +206,8 @@ export function reconcile(month, nextMonth, actualUAH) {
     let pending = 0;
     let paid = 0;
     month.expenses.forEach(e => {
-        if (e.isPaid) paid += e.amountUAH;
-        else pending += e.amountUAH;
+        paid += expensePaid(e);
+        pending += expensePending(e);
     });
     const toPay = pending + bridgeExpenses(nextMonth).total;
     const expectedInHand = Math.max(0, monthReceivedIncome(month) - paid);
@@ -395,7 +416,7 @@ export function payPeriods(state, monthKey) {
     const partsSum = pred => (m.salaryParts || []).filter(p => pred(p.day)).reduce((s, p) => s + (p.uah || 0), 0)
         + (Array.isArray(m.salaryParts) ? 0 : (pred(m.salaryDay) ? m.incomeUAH || 0 : 0));
     const itemsSum = pred => (m.incomes || []).filter(i => pred(i.day)).reduce((s, i) => s + (i.amountUAH || 0), 0);
-    const expSum = (pred, paidOnly = false) => m.expenses.filter(e => pred(e.payDay) && (!paidOnly || e.isPaid)).reduce((s, e) => s + e.amountUAH, 0);
+    const expSum = (pred, paidOnly = false) => m.expenses.filter(e => pred(e.payDay)).reduce((s, e) => s + (paidOnly ? expensePaid(e) : expensePlanned(e)), 0);
 
     const income1 = partsSum(before) + itemsSum(before);
     const income2 = partsSum(d => !before(d)) + itemsSum(d => !before(d));
@@ -432,7 +453,7 @@ export function filterExpenses(items, { status = 'all', categories = [], card = 
         all: () => true,
         unpaid: x => !x.e.isPaid,
         overdue: x => !x.bridge && !x.e.isPaid && isExpenseOverdue(x.e, x.month, today),
-        soon: x => !x.e.isPaid && !(x.bridge ? false : isExpenseOverdue(x.e, x.month, today)) && days(x) >= 0 && days(x) <= 7,
+        soon: x => !x.e.isPaid && !isUndated(x.e) && !(x.bridge ? false : isExpenseOverdue(x.e, x.month, today)) && days(x) >= 0 && days(x) <= 7,
         bridge: x => x.bridge,
         paid: x => x.e.isPaid,
         period1: x => !x.bridge && periodOfDay(x.month, x.e.payDay) === 1,
@@ -444,7 +465,7 @@ export function filterExpenses(items, { status = 'all', categories = [], card = 
         && (min == null || x.e.amountUAH >= min)
         && (max == null || x.e.amountUAH <= max)
         && (!q || x.e.title.toLowerCase().includes(q)));
-    const dateKey = x => (x.bridge ? 100 : 0) + x.e.payDay;
+    const dateKey = x => (x.bridge ? 100 : 0) + (isUndated(x.e) ? 99 : x.e.payDay);
     const sorters = {
         date: (a, b) => dateKey(a) - dateKey(b),
         amountDesc: (a, b) => b.e.amountUAH - a.e.amountUAH,
@@ -465,8 +486,8 @@ export function cardMonthTotals(month, cardId) {
     const t = { spent: 0, planned: 0, received: 0, expected: 0, count: 0 };
     (month.expenses || []).filter(match).forEach(e => {
         t.count++;
-        if (e.isPaid) t.spent += e.amountUAH || 0;
-        else t.planned += e.amountUAH || 0;
+        t.spent += expensePaid(e);
+        t.planned += expensePending(e);
     });
     (month.salaryParts || []).filter(match).forEach(p => {
         t.count++;
@@ -571,7 +592,7 @@ export function upcomingPayments(state, today = new Date(), days = 1) {
         if (!m || !Array.isArray(m.expenses)) continue;
         const last = new Date(m.year, m.month, 0).getDate();
         for (const e of m.expenses) {
-            if (e.isPaid) continue;
+            if (e.isPaid || isUndated(e)) continue;
             const d = Math.min(Math.max(1, e.payDay || 1), last);
             const inDays = Math.round((new Date(m.year, m.month - 1, d) - day0) / 86400000);
             if (inDays >= 0 && inDays <= days) out.push({ monthKey, expense: e, date: { y: m.year, m: m.month, d }, inDays });

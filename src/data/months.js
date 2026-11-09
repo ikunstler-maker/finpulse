@@ -16,6 +16,10 @@ export function createNextMonth(state, key) {
     if (!cur || state.months[nextKey]) return nextKey;
     const [y, m] = nextKey.split('-').map(Number);
     const expenses = seriesExpensesFor(collectSeries(state, key), y, m);
+    // Несплачені витрати «дата пізніше» (не з серії) переходять у новий місяць, щоб не загубилися.
+    const undated = cur.expenses.filter(e => e.noDate && !e.isPaid && !e.seriesId && !e.reserve);
+    cur.expenses = cur.expenses.filter(e => !undated.includes(e));
+    expenses.push(...undated);
     const savings = carryOverBalance(cur, expenses, cur.salaryDay);
     const next = {
         year: y,
