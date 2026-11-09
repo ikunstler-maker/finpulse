@@ -4,7 +4,7 @@
  * Платежі створюються наперед лише в місяцях, які вже існують; новий місяць отримує свої
  * платежі зі всіх серій. Розстрочка — правило з `count`; номер платежу — `installment`.
  */
-import { dayBefore, isoDate, ruleOccurrences } from '../calc.js';
+import { dayBefore, isoDate, isUndated, ruleOccurrences } from '../calc.js';
 import { newId } from './migrate.js';
 
 const FIELDS = ['title', 'category', 'amountUAH', 'amountUSD', 'currency', 'cardId', 'noDate'];
@@ -102,8 +102,8 @@ export function applyFromHere(state, monthKey, expense, rule) {
     const here = ruleOccurrences(rule, month.year, month.month).find(o => o.day === expense.payDay);
     if (rule.count > 1 && here) expense.installment = { current: here.index + 1, total: rule.count };
     fillSeries(state, seriesId, rule, pick(expense), from, expense.id);
-    // той самий день, що й цей платіж, уже зайнятий ним
-    month.expenses = month.expenses.filter(e => !(e.seriesId === seriesId && e.id !== expense.id && e.payDay === expense.payDay));
+    // той самий день, що й цей платіж, уже зайнятий ним; резерв чи «без дати» — сам представляє свій місяць
+    month.expenses = month.expenses.filter(e => !(e.seriesId === seriesId && e.id !== expense.id && (e.payDay === expense.payDay || isUndated(expense))));
 }
 
 export const monthKeyOf = keyOf;

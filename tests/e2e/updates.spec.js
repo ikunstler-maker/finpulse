@@ -11,8 +11,9 @@ test('«Що нового»: крапка на «Ще», список з міт�
     await expect(page.locator('.sheet h3')).toHaveText('Що нового');
     const first = page.locator('.update').first();
     await expect(first).toContainText('9 листопада 2026');
-    await expect(first).toContainText('Резерв і платежі без дати');
-    await expect(first.locator('.tag-new')).toHaveText('Нове');
+    await expect(first.locator('.tag').first()).toBeVisible();
+    const reserve = page.locator('.update', { hasText: 'Резерв і платежі без дати' });
+    await expect(reserve.locator('.tag-new')).toHaveText('Нове');
     expect(await page.locator('.update').count()).toBeGreaterThanOrEqual(10);
     await expect(page.locator('.tag-security').first()).toHaveText('Безпека');
     await expect(page.locator('.update-tags svg').first()).toBeVisible();

@@ -76,3 +76,16 @@ test('резерв: сума на місяць, витрати частинам�
     expect(cafe).toMatchObject({ amountUAH: 2000, isPaid: true, reserve: { spends: [{ amount: 450, day: 29, note: 'Кава з подругою' }] } });
     expect(st.version).toBe(8);
 });
+
+test('щомісячні «Продукти» → резерв: у списку один рядок', async ({ page }) => {
+    await openApp(page);
+    await row(page, 'Продукти').first().locator('[data-action="edit-expense"]').click();
+    await page.locator('[data-kind="reserve"]').click();
+    await page.locator('#expense-form button[type=submit]').click();
+    const scope = page.locator('[data-scope="following"]');
+    if (await scope.count()) await scope.click();
+    const st = await savedState(page);
+    expect(st.months['2026-10'].expenses.filter(e => e.title === 'Продукти')).toHaveLength(1);
+    expect(st.months['2026-11'].expenses.filter(e => e.title === 'Продукти')).toHaveLength(1);
+    await expect(row(page, 'Продукти')).toHaveCount(1);
+});

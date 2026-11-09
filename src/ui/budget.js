@@ -452,7 +452,7 @@ export function openExpenseSheet(monthKey = state.activeMonthKey, id = null, { d
         const noDate = kind === 'normal' && sheet.querySelector('#f-nodate').checked;
         const dayRaw = parseInt(sheet.querySelector('#f-day').value, 10);
         // резерв і «дата пізніше» не мають дня; для правила повторення беремо 1-ше або вже відомий день
-        const day = kind === 'reserve' ? (e.reserve ? e.payDay || 1 : 1) : noDate && !(dayRaw >= 1 && dayRaw <= 31) ? 1 : dayRaw;
+        const day = kind === 'reserve' ? (isNew ? 1 : e.payDay || 1) : noDate && !(dayRaw >= 1 && dayRaw <= 31) ? 1 : dayRaw;
         const fail = msg => { err.textContent = msg; err.hidden = false; };
         if (!title) return fail(t('expense.errTitle'));
         if (!(amt.uah > 0)) return fail(t('expense.errAmount'));

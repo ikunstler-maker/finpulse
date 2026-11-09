@@ -3,3 +3,9 @@ export const GOOGLE_CLIENT_ID = '941554571524-nk0fj2isaanujs66f5vfplij0l19ud43.a
 
 /** Лише прихована папка застосунку на Диску; інші файли користувача недоступні. */
 export const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
+
+/**
+ * Відгуки: вебзастосунок Google Apps Script власниці, який дописує рядок у її Google Таблицю
+ * (код — scripts/google-apps-script/feedback.gs). Адреса не секретна. Порожньо — ще не підключено.
+ */
+export const FEEDBACK_URL = '';

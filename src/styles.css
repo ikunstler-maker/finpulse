@@ -592,3 +592,6 @@ html[data-density="compact"] .big { font-size: clamp(24px, 7vw, 32px); }
     :root:not([data-theme="light"]) .tag-new { color: #4ade80; } :root:not([data-theme="light"]) .tag-improve { color: #93c5fd; }
     :root:not([data-theme="light"]) .tag-fix { color: #fdba74; } :root:not([data-theme="light"]) .tag-design { color: #c4b5fd; } :root:not([data-theme="light"]) .tag-security { color: #cbd5e1; }
 }
+.pick-icon { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; color: var(--muted); }
+.warn-note { color: var(--warn); font-weight: 600; }
+#f-fb-text { width: 100%; resize: vertical; min-height: 110px; font: inherit; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface-2); color: var(--fg); }
