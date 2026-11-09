@@ -2,17 +2,17 @@
  * КАТЕГОРІЇ ТА ЇХНІ КОЛЬОРИ
  */
 export const CATEGORIES = [
-    { id: 'subscriptions', name: 'Підписки та сервіси', icon: '💻', color: '#8b5cf6', section: 'regular' },
-    { id: 'comm', name: 'Зв\'язок та Інтернет', icon: '📱', color: '#10b981', section: 'regular' },
-    { id: 'housing', name: 'Оренда та ЖКГ', icon: '🏠', color: '#0ea5e9', section: 'regular' },
-    { id: 'food', name: 'Продукти та їжа', icon: '🛒', color: '#f59e0b', section: 'regular' },
-    { id: 'beauty', name: 'Догляд та краса', icon: '💅', color: '#ec4899', section: 'lifestyle' },
-    { id: 'health', name: 'Здоров\'я та медицина', icon: '🩺', color: '#06b6d4', section: 'lifestyle' },
-    { id: 'home', name: 'Побут та ремонт', icon: '🛠️', color: '#6366f1', section: 'lifestyle' },
-    { id: 'other', name: 'Інші витрати', icon: '⚡', color: '#14b8a6', section: 'lifestyle' },
-    { id: 'debts', name: 'Борги та розстрочки', icon: '💳', color: '#e11d48', section: 'debts' },
-    { id: 'gifts', name: 'Подарунки та свята', icon: '🎁', color: '#f97316', section: 'gifts' },
-    { id: 'charity', name: 'Благодійність', icon: '🕊️', color: '#84cc16', section: 'charity' },
+    { id: 'subscriptions', name: 'Підписки та сервіси', icon: '💻', color: '#8B5CF6', section: 'regular' },
+    { id: 'comm', name: 'Зв\'язок та Інтернет', icon: '📱', color: '#06B6D4', section: 'regular' },
+    { id: 'housing', name: 'Оренда та ЖКГ', icon: '🏠', color: '#6366F1', section: 'regular' },
+    { id: 'food', name: 'Продукти та їжа', icon: '🛒', color: '#F97316', section: 'regular' },
+    { id: 'beauty', name: 'Догляд та краса', icon: '💅', color: '#EC4899', section: 'lifestyle' },
+    { id: 'health', name: 'Здоров\'я та медицина', icon: '🩺', color: '#10B981', section: 'lifestyle' },
+    { id: 'home', name: 'Побут та ремонт', icon: '🛠️', color: '#D97706', section: 'lifestyle' },
+    { id: 'other', name: 'Інші витрати', icon: '⚡', color: '#94A3B8', section: 'lifestyle' },
+    { id: 'debts', name: 'Борги та розстрочки', icon: '💳', color: '#EF4444', section: 'debts' },
+    { id: 'gifts', name: 'Подарунки та свята', icon: '🎁', color: 'var(--cat-gifts)', section: 'gifts' },
+    { id: 'charity', name: 'Благодійність', icon: '🕊️', color: '#22C55E', section: 'charity' },
 ];
 
 export const INCOME_CATEGORIES = [

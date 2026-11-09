@@ -8,6 +8,7 @@
     --muted: #5d6b7a;
     --accent: #157a5b;
     --accent-soft: #dcf1e8;
+    --cat-gifts: #EAB308;
     --on-accent: #ffffff;
     --warn: #a8640a;
     --warn-soft: #fbefd9;
@@ -26,7 +27,7 @@
 @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
         --bg: #0f141c; --surface: #171e29; --surface-2: #1d2532; --line: #273142; --fg: #e8edf3; --muted: #93a1b2;
-        --accent: #4cc79a; --accent-soft: #173a30; --on-accent: #08130f; --warn: #e8ae4c; --warn-soft: #3a2c14;
+        --accent: #4cc79a; --accent-soft: #173a30; --cat-gifts: #FACC15; --on-accent: #08130f; --warn: #e8ae4c; --warn-soft: #3a2c14;
         --danger: #f07c70; --danger-soft: #3e1d1a; --bridge: #a99cf0; --bridge-soft: #262246;
         --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 28px rgba(0, 0, 0, .35); --scrim: rgba(0, 0, 0, .6);
         color-scheme: dark;
@@ -34,7 +35,7 @@
 }
 :root[data-theme="dark"] {
     --bg: #0f141c; --surface: #171e29; --surface-2: #1d2532; --line: #273142; --fg: #e8edf3; --muted: #93a1b2;
-    --accent: #4cc79a; --accent-soft: #173a30; --on-accent: #08130f; --warn: #e8ae4c; --warn-soft: #3a2c14;
+    --accent: #4cc79a; --accent-soft: #173a30; --cat-gifts: #FACC15; --on-accent: #08130f; --warn: #e8ae4c; --warn-soft: #3a2c14;
     --danger: #f07c70; --danger-soft: #3e1d1a; --bridge: #a99cf0; --bridge-soft: #262246;
     --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 28px rgba(0, 0, 0, .35); --scrim: rgba(0, 0, 0, .6);
     color-scheme: dark;
@@ -527,7 +528,7 @@ html[data-density="compact"] .big { font-size: clamp(24px, 7vw, 32px); }
 /* Calendar */
 .calendar { max-width: 760px; }
 .cal-head { display: flex; justify-content: space-between; margin: 4px 2px 8px; font-size: 13px; color: var(--muted); font-weight: 600; }
-.cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.cal-grid { touch-action: pan-y; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
 .cal-wd { text-align: center; font-size: 12px; font-weight: 700; color: var(--muted); padding: 2px 0 4px; }
 .cal-wd.weekend { color: var(--danger); opacity: .8; }
 .cal-cell {
