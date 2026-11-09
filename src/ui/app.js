@@ -12,6 +12,7 @@ import {
     selectMonth, stepMonth,
 } from './more.js';
 import { openReserveSheet } from './reserve.js';
+import { hasUnseenUpdates, openUpdatesSheet } from './updates.js';
 import { calendarView, openDaySheet, openUndatedSheet, refreshDaySheet } from './calendar.js';
 import { currentPeriodLabel, reportsView } from './reports.js';
 import { openExportSheet } from './export.js';
@@ -45,6 +46,7 @@ export function render() {
         if (b.dataset.tab === view.tab) b.setAttribute('aria-current', 'page');
         else b.removeAttribute('aria-current');
     });
+    document.querySelectorAll('[data-action="more"]').forEach(b => b.classList.toggle('has-news', hasUnseenUpdates()));
     const fab = $('fab');
     fab.hidden = view.tab === 'reports' || view.tab === 'calendar';
     $('fab-label').textContent = view.tab === 'incomes' ? t('fab.income') : t('fab.expense');
@@ -105,6 +107,7 @@ const actions = {
     'new-card': () => openCardSheet(),
     'edit-card': el => openCardSheet(el.dataset.id),
     'open-import': () => openImportSheet(),
+    'open-updates': () => openUpdatesSheet(render),
     'open-reserve': el => openReserveSheet(el.dataset.month, el.dataset.id),
     'cal-undated': () => openUndatedSheet(),
     'cal-day': el => openDaySheet(Number(el.dataset.day)),
