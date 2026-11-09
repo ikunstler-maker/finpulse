@@ -6,7 +6,8 @@ import { esc } from './format.js';
  */
 export function pickerField({ id, label, options, selected }) {
     const cur = options.find(o => o.value === selected) || options[0];
-    const item = o => `<span class="pick-item"><i class="dot" style="background:${o.color || 'transparent'}"></i>${esc(o.label)}</span>`;
+    // icon — власна векторна іконка (розмітка з коду, не з даних людини); інакше кольоровий кружечок
+    const item = o => `<span class="pick-item">${o.icon ? `<svg class="pick-icon" viewBox="0 0 24 24" aria-hidden="true">${o.icon}</svg>` : `<i class="dot" style="background:${o.color || 'transparent'}"></i>`}${esc(o.label)}</span>`;
     return `
         <div class="field picker" data-picker="${id}">
             <span class="lbl" id="${id}-label">${label}</span>

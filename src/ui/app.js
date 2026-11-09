@@ -12,6 +12,7 @@ import {
     selectMonth, stepMonth,
 } from './more.js';
 import { openReserveSheet } from './reserve.js';
+import { openFeedbackSheet } from './feedback.js';
 import { hasUnseenUpdates, openUpdatesSheet } from './updates.js';
 import { calendarView, openDaySheet, openUndatedSheet, refreshDaySheet } from './calendar.js';
 import { currentPeriodLabel, reportsView } from './reports.js';
@@ -107,6 +108,7 @@ const actions = {
     'new-card': () => openCardSheet(),
     'edit-card': el => openCardSheet(el.dataset.id),
     'open-import': () => openImportSheet(),
+    'open-feedback': () => openFeedbackSheet(),
     'open-updates': () => openUpdatesSheet(render),
     'open-reserve': el => openReserveSheet(el.dataset.month, el.dataset.id),
     'cal-undated': () => openUndatedSheet(),

@@ -95,6 +95,7 @@ export function openMoreSheet() {
         <div class="menu">
             <button data-action="open-reconcile"><strong>${t('more.reconcile')}</strong><span>${t('more.reconcileSub')}</span></button>
             <button data-action="open-months"><strong>${t('more.months')}</strong><span>${t('more.monthsSub', { month: esc(m.name) })}</span></button>
+            <button data-action="open-feedback"><strong>${t('feedback.title')}</strong><span>${t('feedback.menuSub')}</span></button>
             <button data-action="open-updates"><strong>${t('updates.title')}${hasUnseenUpdates() ? ` <i class="new-dot" aria-label="${t('updates.newDot')}"></i>` : ''}</strong><span>${t('updates.menuSub')}</span></button>
             <button data-action="open-reminders"><strong>${t('more.reminders')}</strong><span>${t('reminders.menuSub')}</span></button>
             <button data-action="open-cards"><strong>${t('more.cards')}</strong><span>${(state.cards || []).length ? t('more.cardsSub', { n: state.cards.length }) : t('more.cardsEmpty')}</span></button>
