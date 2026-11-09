@@ -10,11 +10,13 @@
  * 7 — гнучкі серії: `repeat: { unit, every, start, count?, until? }` і `seriesId` (платежі однієї серії).
  *     `repeat: true` → щомісяця з дати платежу; `installment` → щомісяця з `count` = кількість платежів;
  *     витрати з однаковою назвою й категорією — одна серія.
+ * 8 — витрати без дати (`noDate: true`) і «Резерв» (`reserve: { spends: [{ id, amount, day?, note? }] }`,
+ *     `amountUAH` — сума резерву на місяць). Старі дані не змінюються — лише номер версії.
  * Ключ localStorage не змінюється; старі дані й бекапи переносяться при завантаженні.
  */
 import { averageSalaryRate, isoDate, round2, salaryTotal, shiftBack } from '../calc.js';
 
-export const DATA_VERSION = 7;
+export const DATA_VERSION = 8;
 
 let counter = 0;
 export const newId = prefix => `${prefix}_${Date.now().toString(36)}${(counter++).toString(36)}${Math.random().toString(36).slice(2, 5)}`;

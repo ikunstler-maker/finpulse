@@ -7,18 +7,20 @@
 import { dayBefore, isoDate, ruleOccurrences } from '../calc.js';
 import { newId } from './migrate.js';
 
-const FIELDS = ['title', 'category', 'amountUAH', 'amountUSD', 'currency', 'cardId'];
+const FIELDS = ['title', 'category', 'amountUAH', 'amountUSD', 'currency', 'cardId', 'noDate'];
 const keyOf = m => `${m.year}-${String(m.month).padStart(2, '0')}`;
 export const expenseDate = (month, e) => isoDate(month.year, month.month, Math.min(e.payDay || 1, new Date(month.year, month.month, 0).getDate()));
 
 /** Платіж серії в місяці. */
 function occurrence(fields, rule, seriesId, day, index) {
-    const e = { id: newId('exp'), ...fields, payDay: day, isPaid: false, repeat: { ...rule }, seriesId };
+    const { isReserve, ...rest } = fields;
+    const e = { id: newId('exp'), ...rest, payDay: day, isPaid: false, repeat: { ...rule }, seriesId };
+    if (isReserve) e.reserve = { spends: [] };
     if (rule.count > 1) e.installment = { current: index + 1, total: rule.count };
     return e;
 }
 
-const pick = e => Object.fromEntries(FIELDS.filter(f => e[f] !== undefined).map(f => [f, e[f]]));
+const pick = e => ({ ...Object.fromEntries(FIELDS.filter(f => e[f] !== undefined).map(f => [f, e[f]])), ...(e.reserve ? { isReserve: true } : {}) });
 
 /** Останній відомий стан кожної серії до місяця `uptoKey` включно: Map(seriesId → { rule, fields }). */
 export function collectSeries(state, uptoKey) {
@@ -56,7 +58,13 @@ export function fillSeries(state, seriesId, rule, fields, fromIso, skipId = null
         }
         for (const e of month.expenses) {
             if (e.id === skipId) continue;
-            if (e.seriesId === seriesId && !e.isPaid) Object.assign(e, fields, { repeat: { ...rule } });
+            if (e.seriesId === seriesId && !e.isPaid) {
+                const { isReserve, ...rest } = fields;
+                Object.assign(e, rest, { repeat: { ...rule } });
+                if (!rest.noDate) delete e.noDate;
+                if (isReserve && !e.reserve) e.reserve = { spends: [] };
+                if (!isReserve) delete e.reserve;
+            }
         }
     }
 }

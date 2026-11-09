@@ -1,4 +1,4 @@
-import { categoryTotals, collectAnalytics, incomeTotals, monthIncomeTotal } from '../calc.js';
+import { categoryTotals, collectAnalytics, expensePaid, expensePlanned, incomeTotals, monthIncomeTotal } from '../calc.js';
 import { CATEGORIES, INCOME_CATEGORIES } from '../data/categories.js';
 import { t } from '../i18n/index.js';
 import { state } from '../state.js';
@@ -39,10 +39,12 @@ export function currentPeriodLabel() {
 
 export function reportsView() {
     const data = collectAnalytics(state, { period: view.reportPeriod, from: view.reportFrom, to: view.reportTo });
-    const paid = data.expenses.filter(e => e.isPaid);
-    const planned = data.expenses.reduce((s, e) => s + e.amountUAH, 0);
+    // Резерв: у плані — його сума, у сплаченому — уже витрачене з нього.
+    const plannedList = data.expenses.map(e => ({ ...e, amountUAH: expensePlanned(e) }));
+    const paid = data.expenses.map(e => ({ ...e, amountUAH: expensePaid(e) })).filter(e => e.amountUAH > 0);
+    const planned = plannedList.reduce((s, e) => s + e.amountUAH, 0);
     const paidSum = paid.reduce((s, e) => s + e.amountUAH, 0);
-    const chartExpenses = view.reportMode === 'paid' ? paid : data.expenses;
+    const chartExpenses = view.reportMode === 'paid' ? paid : plannedList;
     const totals = categoryTotals(chartExpenses, CATEGORIES);
     const incomeCats = [{ id: 'salary', name: t('reports.salary'), color: '#157a5b' }, ...INCOME_CATEGORIES];
     const incomes = incomeTotals(data.incomeByCategory, incomeCats);
@@ -51,7 +53,7 @@ export function reportsView() {
     const activeIdx = Math.max(0, keys.indexOf(state.activeMonthKey));
     const series = keys.slice(Math.max(0, activeIdx - 5), activeIdx + 1).map(k => {
         const m = state.months[k];
-        return { name: m.name.split(' ')[0].slice(0, 4), full: m.name, income: monthIncomeTotal(m), paid: m.expenses.filter(e => e.isPaid).reduce((s, e) => s + e.amountUAH, 0) };
+        return { name: m.name.split(' ')[0].slice(0, 4), full: m.name, income: monthIncomeTotal(m), paid: m.expenses.reduce((s, e) => s + expensePaid(e), 0) };
     });
     const top = Math.max(1, ...series.map(s => Math.max(s.income, s.paid)));
 

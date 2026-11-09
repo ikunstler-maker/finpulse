@@ -1,4 +1,4 @@
-import { categorySummary, computeMonthSummary, dailyAllowance, DEFAULT_RATE, isoDate, ruleOccurrences, shiftBack, filterExpenses, getNextMonthKey, isExpenseOverdue, payPeriods, salaryTotal } from '../calc.js';
+import { categorySummary, computeMonthSummary, dailyAllowance, DEFAULT_RATE, expensePaid, expensePending, isoDate, isUndated, reserveSpent, ruleOccurrences, shiftBack, filterExpenses, getNextMonthKey, isExpenseOverdue, payPeriods, salaryTotal } from '../calc.js';
 import { CATEGORIES } from '../data/categories.js';
 import { newId } from '../data/migrate.js';
 import { applyFromHere, cutSeries, expenseDate } from '../data/series.js';
@@ -90,18 +90,43 @@ export function expenseRow(e, m, monthKey, today, { bridge = false, flat = false
     // У групах стан видно із заголовка; у результатах пошуку позначаємо лише «до ЗП».
     const inst = e.installment ? `<span class="chip installment" title="${t('repeat.installmentOf', e.installment)}">${t('repeat.chip', e.installment)}</span>` : '';
     const chips = (flat && bridge && !e.isPaid ? `<span class="chip bridge">${t('budget.bridgeChip')}</span>` : '') + inst + cardChip(e.cardId);
+    if (e.reserve) return reserveRow(e, m, monthKey, c, inst);
     return itemRow({
         cls: `expense-row ${e.isPaid ? 'paid' : ''} ${overdue ? 'overdue' : ''}`,
         checked: e.isPaid,
         check: { action: 'toggle-paid', month: monthKey, id: e.id },
         edit: { action: 'edit-expense', month: monthKey, id: e.id },
         label: t(e.isPaid ? 'budget.markUnpaid' : 'budget.markPaid', { title: e.title }),
-        date: dayMonth(m.month, e.payDay),
+        date: e.noDate ? t('budget.noDateShort') : dayMonth(m.month, e.payDay),
         title: e.title,
         color: c.color,
         chips,
         amount: money(e.amountUAH),
         sub: e.amountUSD > 0 ? foreign(e.amountUSD, e.currency || 'USD') : '',
+    });
+}
+
+/** Рядок резерву: прогрес «витрачено з суми», праворуч — залишок. Натискання — вікно резерву. */
+function reserveRow(e, m, monthKey, c, inst) {
+    const spent = reserveSpent(e);
+    const limit = e.amountUAH || 0;
+    const over = spent > limit;
+    const pct = limit > 0 ? Math.min(100, spent / limit * 100) : 100;
+    const chips = `
+        <span class="reserve-bar ${over ? 'over' : ''}" aria-hidden="true"><i style="width:${pct.toFixed(1)}%;background:${over ? 'var(--danger)' : c.color}"></i></span>
+        <span class="reserve-text num">${over ? t('reserve.over', { amount: money(spent - limit) }) : t('reserve.progress', { spent: money(spent), limit: money(limit) })}</span>${inst}${cardChip(e.cardId)}`;
+    return itemRow({
+        cls: `expense-row reserve-row ${e.isPaid ? 'paid' : ''} ${over ? 'over' : ''}`,
+        checked: e.isPaid,
+        check: { action: 'toggle-paid', month: monthKey, id: e.id },
+        edit: { action: 'open-reserve', month: monthKey, id: e.id },
+        label: t(e.isPaid ? 'reserve.reopen' : 'reserve.closeLabel', { title: e.title }),
+        date: t('reserve.short'),
+        title: e.title,
+        color: c.color,
+        chips,
+        amount: e.isPaid ? money(spent) : money(Math.max(0, limit - spent)),
+        sub: e.isPaid ? t('reserve.closed') : t('reserve.left'),
     });
 }
 
@@ -149,7 +174,7 @@ export function budgetView(today = new Date()) {
     const nextKey = getNextMonthKey(key);
     const next = state.months[nextKey];
     const f = view.filter;
-    const bridgeItems = next ? next.expenses.filter(e => e.payDay < next.salaryDay) : [];
+    const bridgeItems = next ? next.expenses.filter(e => !isUndated(e) && e.payDay < next.salaryDay) : [];
 
     const presentCats = [...new Set([...m.expenses, ...bridgeItems].map(e => e.category))]
         .sort((a, b) => CATEGORIES.findIndex(c => c.id === a) - CATEGORIES.findIndex(c => c.id === b));
@@ -158,7 +183,7 @@ export function budgetView(today = new Date()) {
     const inFilter = e => !f.categories.length || f.categories.includes(e.category);
 
     const rows = (list, month, mk, opts) => list.map(e => expenseRow(e, month, mk, today, opts));
-    const sum = list => list.reduce((s, e) => s + e.amountUAH, 0);
+    const sum = list => list.reduce((s, e) => s + (e.isPaid ? expensePaid(e) : expensePending(e)), 0);
 
     let filterNote = '';
     if (f.categories.length === 1) {
@@ -183,13 +208,17 @@ export function budgetView(today = new Date()) {
         const sorted = [...m.expenses].filter(inFilter).sort((a, b) => a.payDay - b.payDay);
         const open = sorted.filter(e => !e.isPaid);
         const overdue = open.filter(e => isExpenseOverdue(e, m, today));
-        const notOverdue = open.filter(e => !overdue.includes(e));
+        const reserves = open.filter(e => e.reserve);
+        const noDate = open.filter(e => e.noDate && !e.reserve);
+        const notOverdue = open.filter(e => !overdue.includes(e) && !isUndated(e));
         const soon = notOverdue.filter(e => daysFrom(today, dateOf(m, e.payDay)) <= 7);
         const later = notOverdue.filter(e => !soon.includes(e));
         const paid = sorted.filter(e => e.isPaid);
         const bridge = bridgeItems.filter(inFilter).sort((a, b) => a.payDay - b.payDay);
         content = [
             group('overdue', t('budget.groups.overdue'), rows(overdue, m, key), sum(overdue), t('budget.groups.overdueHint')),
+            group('nodate', t('budget.groups.noDate'), rows(noDate, m, key), sum(noDate), t('budget.groups.noDateHint')),
+            group('reserve', t('budget.groups.reserve'), rows(reserves, m, key), sum(reserves), t('budget.groups.reserveHint')),
             group('soon', t('budget.groups.soon'), rows(soon, m, key), sum(soon)),
             group('later', t('budget.groups.later'), rows(later, m, key), sum(later)),
             next ? group('bridge', t('budget.groups.bridge', { date: dayMonthLong(next.month, next.salaryDay) }), rows(bridge, next, nextKey, { bridge: true }), sum(bridge.filter(e => !e.isPaid)), t('budget.groups.bridgeHint')) : '',
@@ -331,17 +360,23 @@ export function openExpenseSheet(monthKey = state.activeMonthKey, id = null, { d
                 <label for="f-title">${t('expense.title')}</label>
                 <input id="f-title" name="title" value="${esc(e.title)}" placeholder="${t('expense.titlePlaceholder')}" autocomplete="off" maxlength="120">
             </div>
+            <div class="seg wide kind-seg" role="group" aria-label="${t('reserve.kindLabel')}">
+                <button type="button" data-kind="normal" aria-pressed="${!e.reserve}">${t('reserve.kindNormal')}</button>
+                <button type="button" data-kind="reserve" aria-pressed="${!!e.reserve}">${t('reserve.kindReserve')}</button>
+            </div>
+            <p class="sheet-text small" id="f-kind-hint" ${e.reserve ? '' : 'hidden'}>${t('reserve.formHint')}</p>
             ${currencyFields({ currency, amount: currency === 'UAH' ? e.amountUAH : e.amountUSD, rate, uah: e.amountUAH, currencies: ['UAH', 'USD', 'USDT'] })}
             <div class="field-pair day-cat">
-                <div class="field">
+                <div class="field" id="f-day-field" ${e.reserve ? 'hidden' : ''}>
                     <label for="f-day">${t('expense.dayShort', { month: t('months.short').split(',')[month.month - 1] })}</label>
-                    <input id="f-day" type="number" inputmode="numeric" min="1" max="31" value="${e.payDay}">
+                    <input id="f-day" type="number" inputmode="numeric" min="1" max="31" value="${e.payDay}" ${e.noDate ? 'disabled' : ''}>
                 </div>
                 ${pickerField({ id: 'f-category', label: t('expense.category'), selected: e.category, options: CATEGORIES.map(c => ({ value: c.id, label: c.name, color: c.color })) })}
             </div>
+            <label class="check-line" id="f-nodate-line" ${e.reserve ? 'hidden' : ''}><input type="checkbox" id="f-nodate" ${e.noDate ? 'checked' : ''}> ${t('expense.noDate')}</label>
             ${cardField(e.cardId || '')}
             ${repeatFields(isNew ? {} : e)}
-            <div class="toggle"><span id="paid-label">${t('expense.paid')}</span><button type="button" class="switch" role="switch" id="f-paid" aria-checked="${!!e.isPaid}" aria-labelledby="paid-label"></button></div>
+            <div class="toggle" id="f-paid-row" ${e.reserve ? 'hidden' : ''}><span id="paid-label">${t('expense.paid')}</span><button type="button" class="switch" role="switch" id="f-paid" aria-checked="${!!e.isPaid}" aria-labelledby="paid-label"></button></div>
             <p class="form-error" id="form-error" role="alert" hidden></p>
             <div class="actions">
                 <button class="btn primary" type="submit">${isNew ? t('expense.add') : t('common.save')}</button>
@@ -352,7 +387,25 @@ export function openExpenseSheet(monthKey = state.activeMonthKey, id = null, { d
     wireCurrency(sheet);
     wirePickers(sheet);
     wireRepeat(sheet, month);
+    let kind = e.reserve ? 'reserve' : 'normal';
+    const setKind = k => {
+        kind = k;
+        sheet.querySelectorAll('[data-kind]').forEach(b => b.setAttribute('aria-pressed', b.dataset.kind === k));
+        sheet.querySelector('#f-kind-hint').hidden = k !== 'reserve';
+        sheet.querySelector('#f-day-field').hidden = k === 'reserve';
+        sheet.querySelector('#f-nodate-line').hidden = k === 'reserve';
+        sheet.querySelector('#f-paid-row').hidden = k === 'reserve';
+        // резерв зазвичай щомісячний
+        const rep = sheet.querySelector('#f-repeat');
+        if (k === 'reserve' && isNew && rep.value === 'once') {
+            rep.value = 'month';
+            rep.dispatchEvent(new Event('change'));
+        }
+    };
+    sheet.querySelector('#f-nodate').addEventListener('change', ev => { sheet.querySelector('#f-day').disabled = ev.target.checked; });
     sheet.addEventListener('click', ev => {
+        const kb = ev.target.closest('[data-kind]');
+        if (kb) setKind(kb.dataset.kind);
         if (ev.target.closest('#f-paid')) {
             const sw = sheet.querySelector('#f-paid');
             sw.setAttribute('aria-checked', sw.getAttribute('aria-checked') !== 'true');
@@ -396,7 +449,10 @@ export function openExpenseSheet(monthKey = state.activeMonthKey, id = null, { d
         const err = sheet.querySelector('#form-error');
         const title = sheet.querySelector('#f-title').value.trim();
         const amt = readCurrency(sheet);
-        const day = parseInt(sheet.querySelector('#f-day').value, 10);
+        const noDate = kind === 'normal' && sheet.querySelector('#f-nodate').checked;
+        const dayRaw = parseInt(sheet.querySelector('#f-day').value, 10);
+        // резерв і «дата пізніше» не мають дня; для правила повторення беремо 1-ше або вже відомий день
+        const day = kind === 'reserve' ? (e.reserve ? e.payDay || 1 : 1) : noDate && !(dayRaw >= 1 && dayRaw <= 31) ? 1 : dayRaw;
         const fail = msg => { err.textContent = msg; err.hidden = false; };
         if (!title) return fail(t('expense.errTitle'));
         if (!(amt.uah > 0)) return fail(t('expense.errAmount'));
@@ -409,7 +465,7 @@ export function openExpenseSheet(monthKey = state.activeMonthKey, id = null, { d
             amountUAH: amt.uah,
             amountUSD: amt.currency === 'UAH' ? 0 : amt.amount,
             payDay: day,
-            isPaid: sheet.querySelector('#f-paid').getAttribute('aria-checked') === 'true',
+            isPaid: kind === 'reserve' ? !!e.isPaid : sheet.querySelector('#f-paid').getAttribute('aria-checked') === 'true',
         };
         if (amt.currency !== 'UAH') rec.currency = amt.currency;
         const cardId = readCardField(sheet);
@@ -420,6 +476,10 @@ export function openExpenseSheet(monthKey = state.activeMonthKey, id = null, { d
                 const target = isNew ? { id: newId('exp') } : expense;
                 Object.assign(target, rec);
                 if (!isNew && amt.currency === 'UAH') delete target.currency;
+                if (noDate) target.noDate = true;
+                else delete target.noDate;
+                if (kind === 'reserve') target.reserve = target.reserve || { spends: [] };
+                else delete target.reserve;
                 applyCard(target, cardId);
                 if (isNew) month.expenses.push(target);
                 if (scope === 'one') return;
@@ -432,8 +492,8 @@ export function openExpenseSheet(monthKey = state.activeMonthKey, id = null, { d
         const ruleChanged = !sameRule(expense?.repeat, rule);
         if (isNew || !expense.seriesId) return save(rule ? 'following' : 'one');
         if (ruleChanged) return save('following');
-        const before = JSON.stringify([expense.title, expense.category, expense.amountUAH, expense.amountUSD || 0, expense.currency || '', expense.cardId || '', expense.payDay]);
-        const after = JSON.stringify([rec.title, rec.category, rec.amountUAH, rec.amountUSD || 0, rec.currency || '', cardId || '', rec.payDay]);
+        const before = JSON.stringify([expense.title, expense.category, expense.amountUAH, expense.amountUSD || 0, expense.currency || '', expense.cardId || '', expense.payDay, !!expense.noDate, !!expense.reserve]);
+        const after = JSON.stringify([rec.title, rec.category, rec.amountUAH, rec.amountUSD || 0, rec.currency || '', cardId || '', rec.payDay, noDate, kind === 'reserve']);
         if (before === after) return save('one');
         chooseScope({ title: t('repeat.scopeTitle'), text: t('repeat.scopeText'), one: t('repeat.scopeOne'), following: t('repeat.scopeFollowing') })
             .then(scope => { if (scope) save(scope); });

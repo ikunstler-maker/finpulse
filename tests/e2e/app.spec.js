@@ -171,7 +171,7 @@ test('бекап: збереження і відновлення', async ({ page
     const [download] = await Promise.all([page.waitForEvent('download'), page.locator('[data-sheet="export"]').click()]);
     expect(download.suggestedFilename()).toBe('FinPulse_Backup_2026-10-29.json');
     const exported = JSON.parse(await (await download.createReadStream()).toArray().then(b => Buffer.concat(b).toString('utf8')));
-    expect(exported.version).toBe(7);
+    expect(exported.version).toBe(8);
 
     await page.keyboard.press('Escape');
     await page.evaluate(() => localStorage.clear());
@@ -369,7 +369,7 @@ test('регулярні платежі: щотижня, кожні 50 днів,
     await page.locator('#expense-form button[type=submit]').click();
     await expect(row(page, 'Пилосос').locator('.chip.installment')).toHaveText('1/4');
     let st = await savedState(page);
-    expect(st.version).toBe(7);
+    expect(st.version).toBe(8);
     expect(st.months['2026-10'].expenses.find(e => e.title === 'Квіти').repeat).toBeUndefined();
     expect(st.months['2026-10'].expenses.find(e => e.title === 'Пилосос').repeat).toMatchObject({ unit: 'month', every: 1, count: 4 });
 
