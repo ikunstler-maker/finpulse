@@ -10,14 +10,26 @@ import { collectSeries, seriesExpensesFor } from './series.js';
  * одноразові не переносяться), ті самі частини ЗП
  * (ще не отримані), а заощадженнями стає вільний залишок поточного місяця.
  */
-export function createNextMonth(state, key) {
+/** Що перейде в новий місяць (без змін у даних): платежі серій і несплачені «без дати». */
+export function previewNextMonth(state, key) {
+    const cur = state.months[key];
+    const [y, m] = getNextMonthKey(key).split('-').map(Number);
+    return {
+        series: seriesExpensesFor(collectSeries(state, key), y, m),
+        undated: (cur?.expenses || []).filter(e => e.noDate && !e.isPaid && !e.seriesId && !e.reserve),
+    };
+}
+
+/** skip — id серій чи витрат «без дати», які людина зняла в перегляді. */
+export function createNextMonth(state, key, { skip = new Set() } = {}) {
     const cur = state.months[key];
     const nextKey = getNextMonthKey(key);
     if (!cur || state.months[nextKey]) return nextKey;
     const [y, m] = nextKey.split('-').map(Number);
-    const expenses = seriesExpensesFor(collectSeries(state, key), y, m);
+    const preview = previewNextMonth(state, key);
+    const expenses = preview.series.filter(e => !skip.has(e.seriesId));
     // Несплачені витрати «дата пізніше» (не з серії) переходять у новий місяць, щоб не загубилися.
-    const undated = cur.expenses.filter(e => e.noDate && !e.isPaid && !e.seriesId && !e.reserve);
+    const undated = preview.undated.filter(e => !skip.has(e.id));
     cur.expenses = cur.expenses.filter(e => !undated.includes(e));
     expenses.push(...undated);
     const savings = carryOverBalance(cur, expenses, cur.salaryDay);

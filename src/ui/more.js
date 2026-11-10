@@ -1,7 +1,8 @@
 import { getNextMonthKey, reconcile } from '../calc.js';
 import { getDefaultInitialState } from '../data/demo.js';
 import { newId } from '../data/migrate.js';
-import { createNextMonth } from '../data/months.js';
+import { createNextMonth, previewNextMonth } from '../data/months.js';
+import { CATEGORIES } from '../data/categories.js';
 import { t } from '../i18n/index.js';
 import { activeMonth, prepareState, saveState, setState, state, update } from '../state.js';
 import { isEncrypted } from '../sync/controller.js';
@@ -128,6 +129,7 @@ export function openMonthsSheet() {
         </div>
         ${canCreate ? `<button class="btn primary" data-action="create-next-month">${t('months.createNext', { from: esc(activeMonth().name) })}</button>
         <p class="sheet-text small">${t('months.createHint')}</p>` : ''}
+        ${keys.length > 1 ? `<button class="link-btn danger-link" data-action="delete-month">${t('months.deleteBtn', { month: esc(activeMonth().name) })}</button>` : ''}
         <div class="actions"><button class="btn ghost" data-action="close-sheet">${t('common.close')}</button></div>`, { label: t('more.months') });
 }
 
@@ -137,10 +139,62 @@ export function selectMonth(key) {
     closeSheet();
 }
 
-export function createNextMonthFromActive() {
+/** Перегляд перед створенням місяця: що саме перейде, з можливістю зняти зайве. */
+export function openCreateMonthSheet() {
+    const nextKey = getNextMonthKey(state.activeMonthKey);
+    const [y, m] = nextKey.split('-').map(Number);
+    const name = `${t('months.name').split(',')[m - 1]} ${y}`;
+    const { series, undated } = previewNextMonth(state, state.activeMonthKey);
+    const items = [...series.map(e => ({ e, key: e.seriesId })), ...undated.map(e => ({ e, key: e.id }))]
+        .sort((a, b) => (a.e.noDate || a.e.reserve ? 99 : a.e.payDay) - (b.e.noDate || b.e.reserve ? 99 : b.e.payDay));
+    const color = id => (CATEGORIES.find(c => c.id === id) || CATEGORIES.find(c => c.id === 'other')).color;
+    const sheet = openSheet(`
+        <h3>${t('months.createTitle', { month: esc(name) })}</h3>
+        <p class="sheet-text">${t('months.createIntro', { from: esc(activeMonth().name) })}</p>
+        <p class="sheet-text small" id="create-total"></p>
+        <div class="list create-list">
+            ${items.map(({ e, key }) => `
+                <label class="create-item">
+                    <input type="checkbox" data-key="${esc(key)}" data-amount="${e.amountUAH || 0}" checked>
+                    <span class="create-day num">${e.reserve ? t('reserve.short') : e.noDate ? t('budget.noDateShort') : `${e.payDay}`}</span>
+                    <span class="create-title"><i class="dot" style="background:${color(e.category)}"></i>${esc(e.title)}${e.installment ? ` <span class="chip installment">${e.installment.current}/${e.installment.total}</span>` : ''}</span>
+                    <span class="num">${money(e.amountUAH || 0)}</span>
+                </label>`).join('') || `<p class="empty">${t('months.createNone')}</p>`}
+        </div>
+        <p class="sheet-text small">${t('months.createHint2')}</p>
+        <div class="actions"><button class="btn primary" type="button" id="create-month">${t('months.createBtn', { month: esc(name) })}</button></div>`, { label: name });
+    const total = () => {
+        const on = [...sheet.querySelectorAll('[data-key]')].filter(c => c.checked);
+        sheet.querySelector('#create-total').textContent = t('months.createTotal', { n: on.length, amount: money(on.reduce((s, c) => s + Number(c.dataset.amount), 0)) });
+    };
+    total();
+    sheet.addEventListener('change', total);
+    sheet.querySelector('#create-month').addEventListener('click', () => {
+        const skip = new Set([...sheet.querySelectorAll('[data-key]')].filter(c => !c.checked).map(c => c.dataset.key));
+        createNextMonthFromActive(skip);
+    });
+}
+
+/** Видалити місяць (наприклад, створений помилково). Дані інших місяців не змінюються. */
+export async function deleteActiveMonth() {
+    const keys = Object.keys(state.months).sort();
+    if (keys.length < 2) return;
+    const m = activeMonth();
+    const ok = await confirmSheet({ title: t('months.deleteTitle', { month: esc(m.name) }), text: t('months.deleteText'), confirm: t('common.delete') });
+    if (!ok) return;
+    const key = state.activeMonthKey;
+    update(s => {
+        delete s.months[key];
+        const rest = Object.keys(s.months).sort();
+        s.activeMonthKey = rest.filter(k => k < key).pop() || rest[0];
+    });
+    toast(t('months.deleted', { month: m.name }));
+}
+
+export function createNextMonthFromActive(skip = new Set()) {
     let created = '';
     update(s => {
-        const key = createNextMonth(s, s.activeMonthKey);
+        const key = createNextMonth(s, s.activeMonthKey, { skip });
         s.activeMonthKey = key;
         created = s.months[key].name;
     });

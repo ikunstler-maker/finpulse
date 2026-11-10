@@ -145,8 +145,31 @@ test('місяці: перехід, створення наступного з �
     await expect(page.locator('#cycle-name')).toHaveText('Листопад 2026');
     await page.locator('[data-action="next-month"]').click();
     await page.locator('[data-action="create-next-month"]').click();
+    // перегляд: що перейде, зайве можна зняти
+    await expect(page.locator('.sheet h3')).toHaveText('Створити Грудень 2026');
+    const items = page.locator('.create-item');
+    const n = await items.count();
+    expect(n).toBeGreaterThan(3);
+    await expect(page.locator('#create-total')).toContainText(`Перейде: ${n}`);
+    await expect(items.filter({ hasText: 'Подарунок' })).toHaveCount(0); // одноразовий
+    await items.filter({ hasText: 'Продукти' }).locator('input').uncheck();
+    await expect(page.locator('#create-total')).toContainText(`Перейде: ${n - 1}`);
+    await page.locator('#create-month').click();
     await expect(page.locator('#cycle-name')).toHaveText('Грудень 2026');
     await expect(page.locator('#toast')).toContainText('Грудень 2026');
+    const dec = (await savedState(page)).months['2026-12'].expenses.map(e => e.title);
+    expect(dec).not.toContain('Продукти');
+    expect(dec).toHaveLength(n - 1);
+    // помилково створений місяць можна видалити
+    await page.locator('[data-action="open-months"]').first().click();
+    await page.locator('[data-action="delete-month"]').click();
+    await page.locator('[data-confirm="yes"]').click();
+    await expect(page.locator('#cycle-name')).toHaveText('Листопад 2026');
+    expect((await savedState(page)).months['2026-12']).toBeUndefined();
+    await page.locator('[data-action="next-month"]').click();
+    await page.locator('[data-action="create-next-month"]').click();
+    await page.locator('#create-month').click();
+    await expect(page.locator('#cycle-name')).toHaveText('Грудень 2026');
     await page.locator('[data-action="prev-month"]').click();
     await page.locator('[data-action="prev-month"]').click();
     await expect(page.locator('#cycle-name')).toHaveText('Жовтень 2026');
@@ -386,6 +409,7 @@ test('регулярні платежі: щотижня, кожні 50 днів,
     await page.reload();
     await page.locator('[data-action="next-month"]').click();
     await page.locator('[data-action="create-next-month"]').click();
+    await page.locator('#create-month').click();
     await expect(page.locator('#cycle-name')).toHaveText('Листопад 2026');
     st = await savedState(page);
     const nov = st.months['2026-11'].expenses;

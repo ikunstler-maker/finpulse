@@ -8,7 +8,7 @@ import { openImportSheet } from './import.js';
 import { dayMonth } from './format.js';
 import { incomesView, openIncomeSheet, openPartSheet, openSalaryDaySheet, takeSavingsFromPrevious, toggleIncome, togglePart } from './incomes.js';
 import {
-    createNextMonthFromActive, openBackupSheet, openMonthsSheet, openMoreSheet, openReconcileSheet,
+    deleteActiveMonth, openCreateMonthSheet, openBackupSheet, openMonthsSheet, openMoreSheet, openReconcileSheet,
     selectMonth, stepMonth,
 } from './more.js';
 import { openReserveSheet } from './reserve.js';
@@ -102,7 +102,8 @@ const actions = {
     'next-month': () => stepMonth(1),
     'open-months': () => openMonthsSheet(),
     'select-month': el => selectMonth(el.dataset.month),
-    'create-next-month': () => createNextMonthFromActive(),
+    'create-next-month': () => openCreateMonthSheet(),
+    'delete-month': () => deleteActiveMonth(),
     'open-reconcile': () => openReconcileSheet(),
     'open-cards': () => openCardsSheet(),
     'new-card': () => openCardSheet(),

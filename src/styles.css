@@ -595,3 +595,11 @@ html[data-density="compact"] .big { font-size: clamp(24px, 7vw, 32px); }
 .pick-icon { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; color: var(--muted); }
 .warn-note { color: var(--warn); font-weight: 600; }
 #f-fb-text { width: 100%; resize: vertical; min-height: 110px; font: inherit; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface-2); color: var(--fg); }
+.create-list { max-height: 46vh; overflow-y: auto; }
+.create-item { display: grid; grid-template-columns: 24px 44px 1fr auto; gap: 8px; align-items: center; padding: 8px 4px; border-bottom: 1px solid var(--line); cursor: pointer; }
+.create-item input { width: 20px; height: 20px; }
+.create-day { color: var(--muted); font-size: 13px; }
+.create-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.create-title .dot { margin-right: 6px; }
+.create-item:has(input:not(:checked)) { opacity: .5; }
+.danger-link { color: var(--danger); margin-top: 8px; }

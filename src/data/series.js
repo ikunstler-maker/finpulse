@@ -22,14 +22,31 @@ function occurrence(fields, rule, seriesId, day, index) {
 
 const pick = e => ({ ...Object.fromEntries(FIELDS.filter(f => e[f] !== undefined).map(f => [f, e[f]])), ...(e.reserve ? { isReserve: true } : {}) });
 
-/** Останній відомий стан кожної серії до місяця `uptoKey` включно: Map(seriesId → { rule, fields }). */
+/**
+ * Живі серії до місяця `uptoKey` включно: Map(seriesId → { rule, fields }) з останнім станом серії.
+ * Серія жива, якщо її платіж є хоча б в одному з двох останніх наявних місяців, де він мав бути за правилом.
+ * Так старі імпортовані рядки (наприклад, разова витрата торік, позначена «щомісяця») не повертаються,
+ * а видалення одного платежу («лише цей») не зупиняє серію.
+ */
 export function collectSeries(state, uptoKey) {
+    const keys = Object.keys(state.months).sort().filter(k => k <= uptoKey);
     const series = new Map();
-    for (const key of Object.keys(state.months).sort()) {
-        if (key > uptoKey) break;
+    const present = new Map();
+    for (const key of keys) {
         for (const e of state.months[key].expenses || []) {
-            if (e.seriesId && e.repeat && typeof e.repeat === 'object') series.set(e.seriesId, { rule: e.repeat, fields: pick(e) });
+            if (!(e.seriesId && e.repeat && typeof e.repeat === 'object')) continue;
+            series.set(e.seriesId, { rule: e.repeat, fields: pick(e) });
+            if (!present.has(e.seriesId)) present.set(e.seriesId, new Set());
+            present.get(e.seriesId).add(key);
         }
+    }
+    for (const [id, { rule }] of series) {
+        const expected = [];
+        for (let i = keys.length - 1; i >= 0 && expected.length < 2; i--) {
+            const m = state.months[keys[i]];
+            if (ruleOccurrences(rule, m.year, m.month).length) expected.push(keys[i]);
+        }
+        if (expected.length && !expected.some(k => present.get(id).has(k))) series.delete(id);
     }
     return series;
 }
