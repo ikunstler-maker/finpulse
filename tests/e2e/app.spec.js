@@ -466,3 +466,35 @@ test('«можна витрачати на день» і звіт «Звідки
     await expect(bars.first()).toContainText('49 800 ₴');
     await expect(bars.nth(1)).toContainText('Заощадження');
 });
+
+test('вибір кількох витрат: позначити сплаченими і видалити одним дотиком', async ({ page }) => {
+    await openApp(page);
+    await page.locator('[data-action="select-mode"]').click();
+    await expect(page.locator('#fab')).toBeHidden();
+    await expect(page.locator('.bulk-bar')).toBeVisible();
+    // дотик до рядка — вибір, без відкриття форми і без «сплачено»
+    await row(page, 'Стрижка').locator('[data-action="edit-expense"]').click();
+    await row(page, 'Спортзал').locator('[data-action="toggle-paid"]').click();
+    await expect(page.locator('.sheet')).toHaveCount(0);
+    await expect(page.locator('#bulk-count')).toHaveText(/Вибрано: 2 · 2\s000,00 ₴/);
+    await expect(row(page, 'Стрижка')).toHaveClass(/selected/);
+    await page.locator('[data-action="bulk-paid"]').click();
+    await expect(page.locator('[data-group="paid"]')).toContainText('Стрижка');
+    await expect(page.locator('[data-group="paid"]')).toContainText('Спортзал');
+
+    // видалити три: серед них регулярні — питаємо, лише вибрані чи й наступні
+    for (const title of ['Дрібний ремонт', 'Подарунок на день народження', 'Комунальні послуги']) {
+        await row(page, title).locator('[data-action="edit-expense"]').click();
+    }
+    await page.locator('[data-action="bulk-delete"]').click();
+    await expect(page.locator('.sheet h3')).toHaveText('Видалити вибрані (3)?');
+    await page.locator('[data-scope="one"]').click();
+    for (const title of ['Дрібний ремонт', 'Подарунок на день народження', 'Комунальні послуги']) await expect(row(page, title)).toHaveCount(0);
+    await expect(page.locator('#toast')).toHaveText('Видалено: 3');
+    await page.locator('[data-action="select-mode"]').click();
+    await expect(page.locator('.bulk-bar')).toHaveCount(0);
+    await expect(page.locator('#fab')).toBeVisible();
+    const st = await savedState(page);
+    expect(st.months['2026-10'].expenses.find(e => e.title === 'Стрижка').isPaid).toBe(true);
+    expect(st.months['2026-10'].expenses).toHaveLength(11);
+});

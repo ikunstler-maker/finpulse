@@ -6,4 +6,6 @@ export const view = {
     reportFrom: '',
     reportTo: '',
     reportMode: 'planned',
+    /** Режим вибору кількох витрат: null або Set ключів «місяць|id». */
+    select: null,
 };

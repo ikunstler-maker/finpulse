@@ -84,7 +84,22 @@ function periodsBlock() {
 
 /* ---------- Список витрат ---------- */
 
-export function expenseRow(e, m, monthKey, today, { bridge = false, flat = false } = {}) {
+const selKey = (monthKey, id) => `${monthKey}|${id}`;
+
+/** У режимі вибору рядок показує галочку вибору замість «сплачено». */
+function selectable(html, e, monthKey) {
+    if (!view.select) return html;
+    const on = view.select.has(selKey(monthKey, e.id));
+    return html
+        .replace('class="item expense-row', `class="item selecting ${on ? 'selected' : ''} expense-row`)
+        .replace(/aria-checked="(true|false)"/, `aria-checked="${on}"`);
+}
+
+export function expenseRow(e, m, monthKey, today, opts = {}) {
+    return selectable(expenseRowInner(e, m, monthKey, today, opts), e, monthKey);
+}
+
+function expenseRowInner(e, m, monthKey, today, { bridge = false, flat = false } = {}) {
     const c = catOf(e.category);
     const overdue = !e.isPaid && isExpenseOverdue(e, m, today);
     // У групах стан видно із заголовка; у результатах пошуку позначаємо лише «до ЗП».
@@ -165,6 +180,7 @@ function toolbar() {
                 <input id="expense-search" type="search" placeholder="${t('filters.searchPlaceholder')}" value="${esc(view.filter.search)}" data-action-input="search" autocomplete="off">
             </label>
             <button class="btn ghost filter-btn" data-action="open-filters" aria-label="${t('filters.open')}">${t('filters.button')}${n ? ` <span class="badge">${n}</span>` : ''}</button>
+            <button class="btn ghost filter-btn" data-action="select-mode" aria-pressed="${!!view.select}">${t(view.select ? 'bulk.done' : 'bulk.select')}</button>
         </div>`;
 }
 
@@ -240,6 +256,7 @@ export function budgetView(today = new Date()) {
             ${filterNote}
             ${empty}
             ${content}
+            ${bulkBar()}
         </div>`;
 }
 
@@ -624,4 +641,68 @@ function readRepeat(sheet, month, day) {
         rule.until = until;
     }
     return { rule };
+}
+
+/* ---------- Вибір кількох витрат ---------- */
+
+export function toggleSelectMode() {
+    view.select = view.select ? null : new Set();
+}
+
+export function toggleSelected(monthKey, id) {
+    const k = selKey(monthKey, id);
+    if (view.select.has(k)) view.select.delete(k);
+    else view.select.add(k);
+}
+
+const selectedItems = () => [...(view.select || [])].map(k => {
+    const [monthKey, id] = k.split('|');
+    const expense = state.months[monthKey]?.expenses.find(e => e.id === id);
+    return expense ? { monthKey, expense } : null;
+}).filter(Boolean);
+
+/** Панель внизу: скільки вибрано і що з ними зробити. */
+export function bulkBar() {
+    if (!view.select || view.tab !== 'budget') return '';
+    const items = selectedItems();
+    const sum = items.reduce((s, x) => s + (x.expense.amountUAH || 0), 0);
+    return `
+        <div class="bulk-bar" role="toolbar" aria-label="${t('bulk.label')}">
+            <span class="bulk-count num" id="bulk-count">${t('bulk.count', { n: items.length, amount: money(sum) })}</span>
+            <button class="btn ghost" data-action="bulk-all">${t('bulk.all')}</button>
+            <button class="btn ghost" data-action="bulk-paid" ${items.length ? '' : 'disabled'}>${t('bulk.paid')}</button>
+            <button class="btn danger" data-action="bulk-delete" ${items.length ? '' : 'disabled'}>${t('bulk.delete')}</button>
+        </div>`;
+}
+
+/** Вибрати всі витрати, видимі зараз у списку. */
+export function selectAllVisible() {
+    document.querySelectorAll('.expense-row [data-action="toggle-paid"]').forEach(b => view.select.add(selKey(b.dataset.month, b.dataset.id)));
+}
+
+export function bulkMarkPaid() {
+    const items = selectedItems();
+    update(() => items.forEach(x => { x.expense.isPaid = true; }));
+    view.select = new Set();
+    toast(t('bulk.paidDone', { n: items.length }));
+}
+
+export async function bulkDelete() {
+    const items = selectedItems();
+    if (!items.length) return;
+    const hasSeries = items.some(x => x.expense.seriesId);
+    const text = t('bulk.deleteText', { n: items.length, amount: money(items.reduce((s, x) => s + (x.expense.amountUAH || 0), 0)) });
+    const scope = hasSeries
+        ? await chooseScope({ title: t('bulk.deleteTitle', { n: items.length }), text: `${text} ${t('bulk.seriesHint')}`, one: t('bulk.deleteOnly'), following: t('bulk.deleteFollowing') })
+        : (await confirmSheet({ title: t('bulk.deleteTitle', { n: items.length }), text, confirm: t('common.delete') })) && 'one';
+    if (!scope) return;
+    update(s => {
+        for (const { monthKey, expense } of items) {
+            const month = s.months[monthKey];
+            if (scope === 'following' && expense.seriesId) cutSeries(s, expense.seriesId, expenseDate(month, expense), expense.id);
+            month.expenses = month.expenses.filter(x => x.id !== expense.id);
+        }
+    });
+    view.select = new Set();
+    toast(t('bulk.deleted', { n: items.length }));
 }
