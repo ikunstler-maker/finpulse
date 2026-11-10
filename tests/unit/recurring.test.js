@@ -199,3 +199,27 @@ describe('новий місяць: старі імпортовані рядки 
         expect(st.months['2026-12'].expenses.map(e => e.title)).toEqual(['Оренда']);
     });
 });
+
+describe('раз на пів року і раз на рік', () => {
+    const m = (y, mo, list = []) => month(y, mo, list);
+    const ins = (title, day, rule) => exp(title, { payDay: day, seriesId: title, repeat: rule });
+    const run = (st, from, to) => {
+        let key = from;
+        while (key < to) { createNextMonth(st, key); key = Object.keys(st.months).sort().pop(); }
+        return Object.entries(st.months).filter(([, mo]) => mo.expenses.length).map(([k, mo]) => [k, mo.expenses.map(e => e.title).join()]);
+    };
+    it('щороку: лише в листопаді, і повторюється через рік', () => {
+        const st = migrateState({ version: 8, months: { '2026-11': m(2026, 11, [ins('Страховка', 3, { unit: 'year', every: 1, start: '2026-11-03' })]) } });
+        expect(run(st, '2026-11', '2028-01')).toEqual([['2026-11', 'Страховка'], ['2027-11', 'Страховка']]);
+    });
+    it('раз на пів року: травень і листопад, в інші місяці не потрапляє', () => {
+        const st = migrateState({ version: 8, months: { '2026-05': m(2026, 5, [ins('ТО авто', 20, { unit: 'month', every: 6, start: '2026-05-20' })]) } });
+        expect(run(st, '2026-05', '2027-06')).toEqual([['2026-05', 'ТО авто'], ['2026-11', 'ТО авто'], ['2027-05', 'ТО авто']]);
+    });
+    it('видалили «лише цей» у листопаді — серія живе, у травні знову є', () => {
+        const st = migrateState({ version: 8, months: { '2026-05': m(2026, 5, [ins('ТО авто', 20, { unit: 'month', every: 6, start: '2026-05-20' })]) } });
+        run(st, '2026-05', '2026-11');
+        st.months['2026-11'].expenses = [];
+        expect(run(st, '2026-11', '2027-06').map(([k]) => k)).toEqual(['2026-05', '2027-05']);
+    });
+});

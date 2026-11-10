@@ -603,3 +603,17 @@ html[data-density="compact"] .big { font-size: clamp(24px, 7vw, 32px); }
 .create-title .dot { margin-right: 6px; }
 .create-item:has(input:not(:checked)) { opacity: .5; }
 .danger-link { color: var(--danger); margin-top: 8px; }
+
+/* Bulk selection */
+.item.selecting .check .box { border-radius: 50%; border-color: var(--accent); }
+.item.selecting.selected { background: var(--accent-soft); }
+.item.selecting .item-date { color: var(--muted); }
+.bulk-bar {
+    position: fixed; z-index: 6; left: 50%; transform: translateX(-50%); bottom: calc(76px + env(safe-area-inset-bottom));
+    width: min(720px, calc(100% - 24px)); display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; padding: 8px 10px;
+    border-radius: 16px; background: color-mix(in srgb, var(--surface) 88%, transparent); border: 1px solid var(--line); box-shadow: var(--shadow);
+    -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px);
+}
+.bulk-count { flex: 1 1 100%; font-weight: 700; font-size: 13.5px; }
+.bulk-bar .btn { flex: 1; min-height: 40px; padding: 0 10px; }
+@media (min-width: 960px) { .bulk-bar { bottom: 20px; } .bulk-count { flex: 1 1 auto; } .bulk-bar .btn { flex: none; } }

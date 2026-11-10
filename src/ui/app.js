@@ -1,7 +1,7 @@
 import { getNextMonthKey } from '../calc.js';
 import { t } from '../i18n/index.js';
 import { activeMonth, onStateChange, state } from '../state.js';
-import { budgetView, openExpenseSheet, openFiltersSheet, resetFilters, setBudgetRerender, togglePaid } from './budget.js';
+import { bulkDelete, bulkMarkPaid, selectAllVisible, toggleSelected, toggleSelectMode, budgetView, openExpenseSheet, openFiltersSheet, resetFilters, setBudgetRerender, togglePaid } from './budget.js';
 import { openCardSheet, openCardsSheet } from './cards.js';
 import { openGoalSheet, openGoalsSheet, openMoveSheet } from './goals.js';
 import { openImportSheet } from './import.js';
@@ -49,7 +49,7 @@ export function render() {
     });
     document.querySelectorAll('[data-action="more"]').forEach(b => b.classList.toggle('has-news', hasUnseenUpdates()));
     const fab = $('fab');
-    fab.hidden = view.tab === 'reports' || view.tab === 'calendar';
+    fab.hidden = view.tab === 'reports' || view.tab === 'calendar' || !!view.select;
     $('fab-label').textContent = view.tab === 'incomes' ? t('fab.income') : t('fab.expense');
     const main = $('view');
     const searching = document.activeElement?.id === 'expense-search';
@@ -73,14 +73,24 @@ function setDefaultCustomRange() {
     view.reportTo = `${endY}-${pad(endM)}-${pad(Math.max(1, (next?.salaryDay || m.salaryDay) - 1))}`;
 }
 
+/** Режим вибору: дотик до рядка вибирає або знімає вибір. */
+const pick = el => {
+    toggleSelected(el.dataset.month, el.dataset.id);
+    render();
+};
+
 const actions = {
     'close-sheet': () => closeSheet(),
-    'tab': el => { view.tab = el.dataset.tab; closeSheet(); render(); window.scrollTo({ top: 0 }); },
+    'tab': el => { view.select = null; view.tab = el.dataset.tab; closeSheet(); render(); window.scrollTo({ top: 0 }); },
     'more': () => openMoreSheet(),
     'fab': () => (view.tab === 'incomes' ? openIncomeSheet(null, 'extra') : openExpenseSheet()),
     'add-expense': () => openExpenseSheet(),
-    'toggle-paid': el => togglePaid(el.dataset.month, el.dataset.id),
-    'edit-expense': el => openExpenseSheet(el.dataset.month, el.dataset.id),
+    'toggle-paid': el => (view.select ? pick(el) : togglePaid(el.dataset.month, el.dataset.id)),
+    'edit-expense': el => (view.select ? pick(el) : openExpenseSheet(el.dataset.month, el.dataset.id)),
+    'select-mode': () => { toggleSelectMode(); render(); },
+    'bulk-all': () => { selectAllVisible(); render(); },
+    'bulk-paid': () => bulkMarkPaid(),
+    'bulk-delete': () => bulkDelete().then(render),
     'filter-category': el => { view.filter.categories = el.dataset.category === 'all' ? [] : [el.dataset.category]; render(); },
     'open-filters': () => openFiltersSheet(),
     'reset-filters': () => resetFilters(),
@@ -111,7 +121,7 @@ const actions = {
     'open-import': () => openImportSheet(),
     'open-feedback': () => openFeedbackSheet(),
     'open-updates': () => openUpdatesSheet(render),
-    'open-reserve': el => openReserveSheet(el.dataset.month, el.dataset.id),
+    'open-reserve': el => (view.select ? pick(el) : openReserveSheet(el.dataset.month, el.dataset.id)),
     'cal-undated': () => openUndatedSheet(),
     'cal-day': el => openDaySheet(Number(el.dataset.day)),
     'open-export': () => openExportSheet(currentPeriodLabel()),
