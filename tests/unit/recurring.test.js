@@ -162,3 +162,40 @@ describe('перевірка даних і імпорт', () => {
         expect(got['Телефон'].installment).toEqual({ current: 2, total: 3 });
     });
 });
+
+describe('новий місяць: старі імпортовані рядки не повертаються', () => {
+    const m = (y, mo, list) => month(y, mo, list);
+    const ser = (id, title, day, start) => exp(title, { id: `${id}-${start}`, payDay: day, isPaid: true, seriesId: id, repeat: { unit: 'month', every: 1, start } });
+    it('разова витрата торік (позначена щомісячною) не переходить у грудень; живі — переходять', () => {
+        const st = migrateState({ version: 8, activeMonthKey: '2026-11', months: {
+            '2025-02': m(2025, 2, [ser('gift', 'Подарунок', 14, '2025-02-14'), ser('rent', 'Оренда', 10, '2025-02-10')]),
+            '2026-10': m(2026, 10, [ser('rent', 'Оренда', 10, '2026-10-10'), ser('vet', 'Ветеринар', 20, '2026-10-20')]),
+            '2026-11': m(2026, 11, [ser('rent', 'Оренда', 10, '2026-11-10')]), // «Ветеринар» видалено лише в листопаді
+        } });
+        createNextMonth(st, '2026-11');
+        const dec = st.months['2026-12'].expenses.map(e => e.title).sort();
+        expect(dec).toEqual(['Ветеринар', 'Оренда']); // подарунку з лютого 2025 немає; ветеринар — серія жива (є в жовтні)
+    });
+    it('серія без платежів у двох останніх очікуваних місяцях зупинена', () => {
+        const st = migrateState({ version: 8, activeMonthKey: '2026-11', months: {
+            '2026-09': m(2026, 9, [ser('x', 'Курси', 5, '2026-09-05')]),
+            '2026-10': m(2026, 10, []),
+            '2026-11': m(2026, 11, []),
+        } });
+        createNextMonth(st, '2026-11');
+        expect(st.months['2026-12'].expenses).toEqual([]);
+    });
+    it('«кожні 50 днів» живе, навіть якщо в останньому місяці платежу не мало бути', () => {
+        const st = migrateState({ version: 8, activeMonthKey: '2026-12', months: {
+            '2026-11': m(2026, 11, [exp('Фільтр', { payDay: 24, seriesId: 'f', repeat: { unit: 'day', every: 50, start: '2026-10-05' } })]),
+            '2026-12': m(2026, 12, []),
+        } });
+        createNextMonth(st, '2026-12');
+        expect(st.months['2027-01'].expenses.map(e => [e.title, e.payDay])).toEqual([['Фільтр', 13]]);
+    });
+    it('зняте в перегляді не переходить', () => {
+        const st = migrateState({ version: 8, activeMonthKey: '2026-11', months: { '2026-11': m(2026, 11, [ser('rent', 'Оренда', 10, '2026-11-10'), ser('gym', 'Спортзал', 3, '2026-11-03')]) } });
+        createNextMonth(st, '2026-11', { skip: new Set(['gym']) });
+        expect(st.months['2026-12'].expenses.map(e => e.title)).toEqual(['Оренда']);
+    });
+});

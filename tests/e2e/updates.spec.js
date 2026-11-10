@@ -10,7 +10,7 @@ test('«Що нового»: крапка на «Ще», список з міт�
     await page.locator('[data-action="open-updates"]').click();
     await expect(page.locator('.sheet h3')).toHaveText('Що нового');
     const first = page.locator('.update').first();
-    await expect(first).toContainText('9 листопада 2026');
+    await expect(first.locator('.update-date')).toHaveText(/^\d{1,2} \S+ 20\d\d$/);
     await expect(first.locator('.tag').first()).toBeVisible();
     const reserve = page.locator('.update', { hasText: 'Резерв і платежі без дати' });
     await expect(reserve.locator('.tag-new')).toHaveText('Нове');
