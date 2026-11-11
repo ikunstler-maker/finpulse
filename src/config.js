@@ -8,4 +8,4 @@ export const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
  * Відгуки: вебзастосунок Google Apps Script власниці, який дописує рядок у її Google Таблицю
  * (код — scripts/google-apps-script/feedback.gs). Адреса не секретна. Порожньо — ще не підключено.
  */
-export const FEEDBACK_URL = '';
+export const FEEDBACK_URL = 'https://script.google.com/macros/s/AKfycbxOK1w3EaiWIDsQdHxajlFvav2cM3XBm7i_mqE-ekvesbLDjgJRaHlbcKSDFBE6IFIHLA/exec';
